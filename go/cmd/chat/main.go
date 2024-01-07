@@ -2,8 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	chat "github.com/Embiggenerd/spiritio/pkg/chat"
@@ -21,7 +25,17 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	http.ServeFile(w, r, "../../static/home.html")
+	path, err := os.Getwd()
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Println(path)
+	_, b, _, _ := runtime.Caller(0)
+	basepath := filepath.Dir(b)
+
+	fmt.Println(basepath)
+
+	http.ServeFile(w, r, "../../static/index.html")
 }
 
 func main() {
@@ -40,4 +54,5 @@ func main() {
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
+	log.Printf("Chat service up on port %s", *addr)
 }
