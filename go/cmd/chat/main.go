@@ -46,9 +46,6 @@ func main() {
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		chat.ServeWs(hub, w, r)
 	})
-	http.HandleFunc("/wss", func(w http.ResponseWriter, r *http.Request) {
-		chat.ServeWs(hub, w, r)
-	})
 	server := &http.Server{
 		Addr:              *addr,
 		ReadHeaderTimeout: 3 * time.Second,
