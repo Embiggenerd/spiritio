@@ -1,8 +1,10 @@
 package chat
 
-// Hub maintains the set of active clients and broadcasts messages to the
+import "github.com/Embiggenerd/spiritio/pkg/config"
+
+// WebsocketService maintains the set of active clients and broadcasts messages to the
 // clients.
-type Hub struct {
+type WebsocketService struct {
 	// Registered clients.
 	clients map[*Client]bool
 
@@ -10,38 +12,38 @@ type Hub struct {
 	broadcast chan []byte
 
 	// Register requests from the clients.
-	register chan *Client
+	Register chan *Client
 
 	// Unregister requests from clients.
 	unregister chan *Client
 }
 
-func NewHub() *Hub {
-	return &Hub{
+func NewWebsocketService(cfg *config.Config) *WebsocketService {
+	return &WebsocketService{
 		broadcast:  make(chan []byte),
-		register:   make(chan *Client),
+		Register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
 	}
 }
 
-func (h *Hub) Run() {
+func (w *WebsocketService) Run() {
 	for {
 		select {
-		case client := <-h.register:
-			h.clients[client] = true
-		case client := <-h.unregister:
-			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
-				close(client.send)
+		case client := <-w.Register:
+			w.clients[client] = true
+		case client := <-w.unregister:
+			if _, ok := w.clients[client]; ok {
+				delete(w.clients, client)
+				close(client.Send)
 			}
-		case message := <-h.broadcast:
-			for client := range h.clients {
+		case message := <-w.broadcast:
+			for client := range w.clients {
 				select {
-				case client.send <- message:
+				case client.Send <- message:
 				default:
-					close(client.send)
-					delete(h.clients, client)
+					close(client.Send)
+					delete(w.clients, client)
 				}
 			}
 		}

@@ -3,109 +3,7 @@
 
 <head>
     <title>Chat</title>
-    <script type="text/javascript">
-        window.onload = function () {
-            // Text stuff
-            let conn = null;
-            const wsProtocol = document.location.hostname.includes("localhost") ? "ws://" : "wss://"
-            console.log("document.location.hostname", document.location.hostname)
-            const msg = document.getElementById("msg");
-            const log = document.getElementById("log");
 
-            function appendLog(item) {
-                var doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
-                log.appendChild(item);
-                if (doScroll) {
-                    log.scrollTop = log.scrollHeight - log.clientHeight;
-                }
-            }
-
-            document.getElementById("form").onsubmit = function () {
-                if (!conn) {
-                    return false;
-                }
-                if (!msg.value) {
-                    return false;
-                }
-                conn.send(msg.value);
-                msg.value = "";
-                return false;
-            };
-
-            if (window["WebSocket"]) {
-                conn = new WebSocket(wsProtocol + document.location.host + "/ws");
-                conn.onclose = function (evt) {
-                    const item = document.createElement("div");
-                    item.innerHTML = "<b>Connection closed.</b>";
-                    appendLog(item);
-                };
-                conn.onmessage = function (evt) {
-                    const messages = evt.data.split('\n');
-                    for (var i = 0; i < messages.length; i++) {
-                        var item = document.createElement("div");
-                        item.innerText = messages[i];
-                        appendLog(item);
-                    }
-                };
-            } else {
-                var item = document.createElement("div");
-                item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
-                appendLog(item);
-            }
-
-            // async function playVideoFromCamera() {
-            //     try {
-            //         const constraints = { 'video': true, 'audio': true };
-            //         const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            //         const videoElement = document.querySelector('video#localVideo');
-            //         videoElement.srcObject = stream;
-            //     } catch (error) {
-            //         console.error('Error opening video camera.', error);
-            //     }
-            // }
-            // playVideoFromCamera()
-
-            // Video stuff
-            // const openMediaDevices = async (constraints) => {
-            //     return await navigator.mediaDevices.getUserMedia(constraints);
-            // }
-
-            // try {
-            //     const stream = openMediaDevices({ 'video': true, 'audio': true });
-            //     console.log('Got MediaStream:', stream);
-            // } catch (error) {
-            //     console.error('Error accessing media devices.', error);
-            // }
-
-            // Updates the select element with the provided set of cameras
-            // function updateCameraList(cameras) {
-            //     const listElement = document.querySelector('select#availableCameras');
-            //     listElement.innerHTML = '';
-            //     cameras.map(camera => {
-            //         const cameraOption = document.createElement('option');
-            //         cameraOption.label = camera.label;
-            //         cameraOption.value = camera.deviceId;
-            //     }).forEach(cameraOption => listElement.add(cameraOption));
-            // }
-
-            // // Fetch an array of devices of a certain type
-            // async function getConnectedDevices(type) {
-            //     const devices = await navigator.mediaDevices.enumerateDevices();
-            //     return devices.filter(device => device.kind === type)
-            // }
-
-            // // Get the initial set of cameras connected
-            // const videoCameras = getConnectedDevices('videoinput');
-            // updateCameraList(videoCameras);
-
-            // // Listen for changes to media devices and update the list accordingly
-            // navigator.mediaDevices.addEventListener('devicechange', event => {
-            //     const newCameraList = getConnectedDevices('video');
-            //     updateCameraList(newCameraList);
-            // });
-
-        };
-    </script>
     <style type="text/css">
         html {
             overflow: hidden;
@@ -124,7 +22,7 @@
             background: white;
             margin: 0;
             padding: 0.5em 0.5em 0.5em 0.5em;
-            position: absolute;
+            /* position: absolute; */
             top: 0.5em;
             left: 0.5em;
             right: 0.5em;
@@ -135,23 +33,195 @@
         #form {
             padding: 0 0.5em 0 0.5em;
             margin: 0;
-            position: absolute;
+            /* position: absolute; */
             bottom: 1em;
             left: 0px;
             width: 100%;
             overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
         }
     </style>
 </head>
 
 <body>
     <!-- <video id="localVideo" autoplay playsinline controls="false" /> -->
+    <div class="container">
+        <h3> Local Video </h3>
+        <video id="localVideo" width="160" height="120" autoplay muted></video> <br />
 
-    <div id="log"></div>
-    <form id="form">
-        <input type="submit" value="Send" />
-        <input type="text" id="msg" size="64" autofocus />
-    </form>
+        <h3> Remote Video </h3>
+        <div id="remoteVideos"></div> <br />
+        <div id="log"></div>
+        <form id="form">
+            <input type="submit" value="Send" />
+            <input type="text" id="msg" size="64" autofocus />
+        </form>
+    </div>
 </body>
+<script type="text/javascript">
+    function handleTextStream(ws, evt) {
+        const jsonMsg = JSON.parse(evt.data)
+        const message = jsonMsg.data;
+        var item = document.createElement("div");
+        item.innerText = message;
+        appendLog(item);
+    }
+
+    function handleVideoAudioStreamMessage(ws, evt) {
+        let msg = JSON.parse(evt.data)
+        if (!msg) {
+            return console.log('failed to parse msg')
+        }
+
+        switch (msg.event) {
+            case 'offer':
+                let offer = JSON.parse(msg.data)
+                if (!offer) {
+                    return console.log('failed to parse answer')
+                }
+                pc.setRemoteDescription(offer)
+                pc.createAnswer().then(answer => {
+                    pc.setLocalDescription(answer)
+                    ws.send(JSON.stringify({ event: 'answer', data: JSON.stringify(answer) }))
+                })
+                return
+
+            case 'candidate':
+                let candidate = JSON.parse(msg.data)
+                if (!candidate) {
+                    return console.log('failed to parse candidate')
+                }
+
+                pc.addIceCandidate(candidate)
+            }
+        }
+
+        function initVideoAudioStream(ws) {
+            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then(stream => {
+                    let pc = new RTCPeerConnection()
+                    pc.ontrack = function (event) {
+                        if (event.track.kind === 'audio') {
+                            return
+                        }
+
+                        let el = document.createElement(event.track.kind)
+                        el.srcObject = event.streams[0]
+                        el.autoplay = true
+                        el.controls = true
+                        document.getElementById('remoteVideos').appendChild(el)
+
+                        event.track.onmute = function (event) {
+                            el.play()
+                        }
+
+                        event.streams[0].onremovetrack = ({ track }) => {
+                            if (el.parentNode) {
+                                el.parentNode.removeChild(el)
+                            }
+                        }
+                    }
+
+                    document.getElementById('localVideo').srcObject = stream
+                    stream.getTracks().forEach(track => pc.addTrack(track, stream))
+
+                    // let ws = new WebSocket("{{.}}")
+
+                    // window.sendMessage = (message) => {
+                    //     // const message = document.getElementById('message').value
+                    //     console.log("send message called with data", message)
+                    //     if (message === '') {
+                    //         return alert('Message must not be empty')
+                    //     }
+
+                    //     ws.send(JSON.stringify({ event: 'user-message', data: JSON.stringify(message) }))
+                    // }
+
+                    pc.onicecandidate = e => {
+                        if (!e.candidate) {
+                            return
+                        }
+                        const json = { event: 'candidate', data: JSON.stringify(e.candidate) }
+                        console.log("sending ice candidate event", json)
+
+                        ws.send(JSON.stringify(json))
+                    }
+
+                    // ws.onclose = function (evt) {
+                    //     window.alert("Websocket has closed")
+                    // }
+
+                    // ws.onmessage = function (evt) {
+
+                    // case 'user-message':
+                    //     console.log(`New message received: ${msg.data}`)
+                    // }
+                    // }
+
+                    // ws.onerror = function (evt) {
+                    //     console.log("ERROR: " + evt.data)
+                    // }
+                }).catch(window.alert)
+        }
+        const wsProtocol = document.location.hostname.includes("localhost") ? "ws://" : "wss://"
+        let conn = null;
+        if (window["WebSocket"]) {
+            conn = new WebSocket(wsProtocol + document.location.host + "/ws");
+        }
+
+
+
+        initVideoAudioStream(conn)
+
+        const msg = document.getElementById("msg");
+        const log = document.getElementById("log");
+
+        function appendLog(item) {
+            var doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
+            log.appendChild(item);
+            if (doScroll) {
+                log.scrollTop = log.scrollHeight - log.clientHeight;
+            }
+        }
+
+        document.getElementById("form").onsubmit = function () {
+            if (!conn) {
+                return false;
+            }
+            if (!msg.value) {
+                return false;
+            }
+            const msghi = `{"event":"user-message","data":"${msg.value}"}`
+            const json = JSON.parse(msghi)
+            console.log("message submitted", { json })
+            conn.send(msghi);
+            msg.value = "";
+            return false;
+        };
+
+        // if (window["WebSocket"]) {
+        //     conn = new WebSocket(wsProtocol + document.location.host + "/ws");
+        conn.onclose = function (evt) {
+            const item = document.createElement("div");
+            item.innerHTML = "<b>Connection closed.</b>";
+            appendLog(item);
+        };
+        conn.onmessage = function (evt) {
+            handleVideoAudioStreamMessage(conn, evt)
+            handleTextStream(conn, evt)
+        };
+    // } else {
+    //     var item = document.createElement("div");
+    //     item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
+    //     appendLog(item);
+    // }
+    // };
+</script>
 
 </html>

@@ -1,0 +1,9 @@
+1. Implement data channel chat
+2. Refactor code
+3. Testing
+4. Implement websocket chat failover
+5. Implement screen sharing.
+6. 
+
+Goodie bag:
+SFU -> MCU when too many streams.
