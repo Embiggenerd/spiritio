@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type websocketMessage struct {
+type WebsocketMessage struct {
 	Event string `json:"event"`
 	Data  string `json:"data"`
 }
@@ -41,7 +41,7 @@ var upgrader = websocket.Upgrader{
 type Client struct {
 	WebsocketService *WebsocketService
 	SFU              *sfu.SFU
-	Conn             *websocket.Conn
+	Conn             *sfu.ThreadSafeWriter
 	Send             chan []byte
 }
 
@@ -61,33 +61,35 @@ type Client struct {
 // The application runs readPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
+
+// In pump, split based on events to different endpoints.
 func (c *Client) ReadPump() {
 	defer func() {
+		log.Println("readpump deffered")
 		c.WebsocketService.unregister <- c
 		c.Conn.Close()
 	}()
-	c.Conn.SetReadLimit(maxMessageSize)
+	// c.Conn.SetReadLimit(maxMessageSize)
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.Conn.SetPongHandler(func(string) error { c.Conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-		message := &websocketMessage{}
+		message := &WebsocketMessage{}
 		_, raw, err := c.Conn.ReadMessage()
+		log.Println("reading message error", err)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
+				log.Printf("1error: %v", err)
 			}
 			break
 		}
 		log.Println("new message pushed to broadcast chan, ", string(raw[:]))
 		if err != nil {
-			log.Println(err)
+			log.Println("2error:", err)
 			return
 		} else if err := json.Unmarshal(raw, &message); err != nil {
-			log.Println(err)
+			log.Println("3error:", err)
 			return
 		}
-		// message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		// byteMessage := []
 		c.WebsocketService.broadcast <- raw
 	}
 }
@@ -98,45 +100,49 @@ func (c *Client) ReadPump() {
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
 func (c *Client) WritePump() {
+	log.Println("we got to WritePump")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
+		log.Println("write pump deferred")
 		ticker.Stop()
 		c.Conn.Close()
 	}()
 	for {
 		select {
 		case raw, ok := <-c.Send:
-			message := &websocketMessage{}
+			message := &WebsocketMessage{}
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
-				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				// c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				log.Println("this righ here is what happened")
+				c.Conn.WriteJSON(websocket.CloseMessage)
 				return
 			}
 
-			w, err := c.Conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return
-			}
+			// w, err := c.Conn.NextWriter(websocket.TextMessage)
+			// if err != nil {
+			// 	return
+			// }
 
-			if err != nil {
+			// if err != nil {
+			// 	log.Println(err)
+			// 	return
+			if err := json.Unmarshal(raw, &message); err != nil {
 				log.Println(err)
 				return
-			} else if err := json.Unmarshal(raw, &message); err != nil {
-				log.Println(err)
-				return
 			}
-			log.Println("new message sent from broadcast chan, ", message)
-			w.Write(raw)
-
+			// log.Println("new message sent from broadcast chan, ", message)
+			// w.Write(raw)
+			c.Conn.WriteJSON(message)
 			// Add queued chat messages to the current websocket message.
 			n := len(c.Send)
 			for i := 0; i < n; i++ {
-				w.Write(newline)
-				w.Write(<-c.Send)
+				c.Conn.WriteJSON(newline)
+				c.Conn.WriteJSON(<-c.Send)
 			}
 
-			if err := w.Close(); err != nil {
+			if err := c.Conn.Close(); err != nil {
 				return
 			}
 		case <-ticker.C:

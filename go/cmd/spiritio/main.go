@@ -47,13 +47,18 @@ func main() {
 	// websocketService := chat.NewWebsocketService(cfg)
 	selectiveForwardingUnit := sfu.NewSelectiveForwardingUnit(cfg)
 	websocketService := chat.NewWebsocketService(cfg)
-	go websocketService.Run()
+	// go websocketService.Run()
 	// websocketPeerHandler := handlers.NewWebsocketPeerHandler(cfg, websocketService, selectiveForwardingUnit)
 	// websocketClient := chat.NewWebsocketClient(websocketService, cfg)
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		handlers.ServeWs(websocketService, selectiveForwardingUnit, w, r)
 	})
+	go func() {
+		for range time.NewTicker(time.Second * 3).C {
+			selectiveForwardingUnit.DispatchKeyFrame()
+		}
+	}()
 	server := &http.Server{
 		Addr:              *addr,
 		ReadHeaderTimeout: 3 * time.Second,

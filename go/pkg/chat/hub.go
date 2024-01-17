@@ -1,6 +1,10 @@
 package chat
 
-import "github.com/Embiggenerd/spiritio/pkg/config"
+import (
+	"log"
+
+	"github.com/Embiggenerd/spiritio/pkg/config"
+)
 
 // WebsocketService maintains the set of active clients and broadcasts messages to the
 // clients.
@@ -34,10 +38,13 @@ func (w *WebsocketService) Run() {
 			w.clients[client] = true
 		case client := <-w.unregister:
 			if _, ok := w.clients[client]; ok {
+				log.Println("client unregistered")
+
 				delete(w.clients, client)
 				close(client.Send)
 			}
 		case message := <-w.broadcast:
+			log.Println("message was receiced from boradcast", string(message))
 			for client := range w.clients {
 				select {
 				case client.Send <- message:
