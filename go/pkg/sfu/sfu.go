@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Embiggenerd/spiritio/pkg/config"
-	"github.com/gorilla/websocket"
+	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 )
@@ -22,28 +22,18 @@ type SFU struct {
 func NewSelectiveForwardingUnit(cfg *config.Config) *SFU {
 	s := &SFU{}
 	s.trackLocals = map[string]*webrtc.TrackLocalStaticRTP{}
-	// do this in the handler
-	// go func() {
-	// 	for range time.NewTicker(time.Second * 3).C {
-	// 		s.DispatchKeyFrame()
-	// 	}
-	// }()
 	return s
 }
 
 func (s *SFU) DispatchKeyFrame() {
 	s.ListLock.Lock()
 	defer s.ListLock.Unlock()
-	log.Println("$$$$$$$ dispatchKeyFrame(), $$$$$$$$", len(s.PeerConnections))
 	for i := range s.PeerConnections {
-		// log.Println("peerConnection.ConnectionState().String() in dispatch", s.PeerConnections[i].PeerConnection.ConnectionState().String())
 
 		for _, receiver := range s.PeerConnections[i].PeerConnection.GetReceivers() {
 			if receiver.Track() == nil {
-				log.Println("receiver.Tracl == nil")
 				continue
 			}
-			log.Println("we never get past this in dispatch")
 			err := s.PeerConnections[i].PeerConnection.WriteRTCP([]rtcp.Packet{
 				&rtcp.PictureLossIndication{
 					MediaSSRC: uint32(receiver.Track().SSRC()),
@@ -119,7 +109,7 @@ func (s *SFU) SignalPeerConnections() {
 				return true
 			}
 
-			if err = s.PeerConnections[i].Websocket.WriteJSON(&websocketMessage{
+			if err = s.PeerConnections[i].Websocket.WriteJSON(&websocketClient.WebsocketMessage{
 				Event: "offer",
 				Data:  string(offerString),
 			}); err != nil {
@@ -174,24 +164,7 @@ func (s *SFU) RemoveTrack(t *webrtc.TrackLocalStaticRTP) {
 	delete(s.trackLocals, t.ID())
 }
 
-func (t *ThreadSafeWriter) WriteJSON(v interface{}) error {
-	t.Lock()
-	defer t.Unlock()
-
-	return t.Conn.WriteJSON(v)
-}
-
-type ThreadSafeWriter struct {
-	*websocket.Conn
-	sync.Mutex
-}
-
-type websocketMessage struct {
-	Event string `json:"event"`
-	Data  string `json:"data"`
-}
-
 type PeerConnectionState struct {
 	PeerConnection *webrtc.PeerConnection
-	Websocket      *ThreadSafeWriter
+	Websocket      *websocketClient.ThreadSafeWriter
 }

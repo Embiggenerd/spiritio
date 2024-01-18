@@ -4,21 +4,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"sync"
 
-	"github.com/Embiggenerd/spiritio/pkg/chat"
 	"github.com/Embiggenerd/spiritio/pkg/sfu"
-	"github.com/gorilla/websocket"
+	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
 	"github.com/pion/webrtc/v3"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-}
-
 // type Client struct {
-// 	websocketService *chat.WebsocketService
+// 	websocketService *websocketService.WebsocketService
 // 	sfu              *sfu.SFU
 // 	conn             *websocket.Conn
 // 	send             chan []byte
@@ -30,17 +23,17 @@ var upgrader = websocket.Upgrader{
 // }
 
 // ServeWs handles websocket requests from the peer.
-func ServeWs(websocketService *chat.WebsocketService, sfuService *sfu.SFU, w http.ResponseWriter, r *http.Request) {
-	unsafeConn, err := upgrader.Upgrade(w, r, nil)
+func ServeWs(sfuService *sfu.SFU, w http.ResponseWriter, r *http.Request) {
+	// unsafeConn, err := upgrader.Upgrade(w, r, nil)
+	// writer, err := wsService.CreateWebsocketConnectionWriter(w, r, nil)
+	wsClient, err := websocketClient.NewWebsocketClient(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	conn := &sfu.ThreadSafeWriter{unsafeConn, sync.Mutex{}}
-	defer conn.Close()
+	defer wsClient.Conn.Close()
 
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
-	log.Println("peerConnection.ConnectionState().String()", peerConnection.ConnectionState().String())
 	if err != nil {
 		log.Print(err)
 		return
@@ -55,15 +48,9 @@ func ServeWs(websocketService *chat.WebsocketService, sfuService *sfu.SFU, w htt
 			return
 		}
 	}
-	// client := &chat.Client{WebsocketService: websocketService, SFU: sfuService, Conn: conn, Send: make(chan []byte, 256)}
-	// client.WebsocketService.Register <- client
-	// log.Println("we got past Rigester <- client ^^^^^****")
-	// go client.WritePump()
-	// go client.ReadPump()
 
-	// Add our new PeerConnection to global list
 	sfuService.ListLock.Lock()
-	sfuService.PeerConnections = append(sfuService.PeerConnections, sfu.PeerConnectionState{PeerConnection: peerConnection, Websocket: conn})
+	sfuService.PeerConnections = append(sfuService.PeerConnections, sfu.PeerConnectionState{PeerConnection: peerConnection, Websocket: wsClient.Writer})
 	sfuService.ListLock.Unlock()
 	peerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
 		if i == nil {
@@ -76,7 +63,7 @@ func ServeWs(websocketService *chat.WebsocketService, sfuService *sfu.SFU, w htt
 			return
 		}
 
-		if writeErr := conn.WriteJSON(&chat.WebsocketMessage{
+		if writeErr := wsClient.Conn.WriteJSON(&websocketClient.WebsocketMessage{
 			Event: "candidate",
 			Data:  string(candidateString),
 		}); writeErr != nil {
@@ -118,9 +105,9 @@ func ServeWs(websocketService *chat.WebsocketService, sfuService *sfu.SFU, w htt
 	sfuService.SignalPeerConnections()
 	log.Println("^^sfuService.ListLock.Unlock()")
 
-	message := &chat.WebsocketMessage{}
+	message := &websocketClient.WebsocketMessage{}
 	for {
-		_, raw, err := conn.ReadMessage()
+		_, raw, err := wsClient.Conn.ReadMessage()
 		log.Println("new message, * ", string(raw[:]), err)
 		if err != nil {
 			log.Println(err)
@@ -160,10 +147,6 @@ func ServeWs(websocketService *chat.WebsocketService, sfuService *sfu.SFU, w htt
 
 		case "user-message":
 			log.Printf("writing message: %s", message.Data)
-			// if err := c.WriteJSON(message); err != nil {
-			// 	log.Println(err)
-			// 	return
-			// }
 			for i := range sfuService.PeerConnections {
 				if err = sfuService.PeerConnections[i].Websocket.WriteJSON(message); err != nil {
 					log.Println(err)

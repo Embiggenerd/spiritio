@@ -7,6 +7,7 @@
     <style type="text/css">
         html {
             overflow: hidden;
+            height: 100%;
         }
 
         body {
@@ -20,15 +21,16 @@
 
         #log {
             background: white;
-            margin: 0;
-            padding: 0.5em 0.5em 0.5em 0.5em;
+            height: 100%;
+            /* margin: 0; */
+            /* padding: 0.5em 0.5em 0.5em 0.5em; */
             /* position: absolute; */
-            top: 0.5em;
+            /* top: 0.5em;
             left: 0.5em;
             right: 0.5em;
-            bottom: 3em;
+            bottom: 3em; */
             overflow: auto;
-            height: 100px;
+            height: 500px;
         }
 
         #form {
@@ -38,31 +40,63 @@
             bottom: 1em;
             left: 0px;
             width: 100%;
+            
             overflow: hidden;
         }
 
         .container {
             display: flex;
-            flex-direction: column;
-            height: 100%;
-            width: 100%;
+            flex-direction: row;
+            /* height: 100vh; */
+            /* width: 100%; */
+            padding: 60px 30px;
+            justify-content: space-evenly;
+            align-items: end;
         }
+
+        .video_audio {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100% ;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            max-width: 300px;
+            /* height: 100% */
+        }
+
+        .remote_video {
+            width: 100%;
+            aspect-ratio: 4 3;
+        }
+        #remoteVideos{
+            /* width: 100%; */
+        }
+
     </style>
 </head>
 
 <body>
     <!-- <video id="localVideo" autoplay playsinline controls="false" /> -->
     <div class="container">
-        <h3> Local Video </h3>
-        <video id="localVideo" width="160" height="120" autoplay muted></video> <br />
-
-        <h3> Remote Video </h3>
-        <div id="remoteVideos"></div> <br />
-        <div id="log"></div>
-        <form id="form">
-            <input type="submit" value="Send" />
-            <input type="text" id="msg" size="64" autofocus />
-        </form>
+        <div class="video_audio">
+            <div id="remoteVideos"></div> 
+            <h3>You</h3>
+            <video id="localVideo" width="160" height="120" autoplay muted></video> 
+        </div>
+        <div class="chat">
+            <div id="log"></div>
+            <form id="form">
+                <input type="submit" value="Send" />
+                <input type="text" id="msg" size="64" autofocus />
+            </form>
+        </div>
     </div>
 </body>
 <script type="text/javascript">
@@ -246,8 +280,9 @@
                 el.srcObject = event.streams[0]
                 el.autoplay = true
                 el.controls = true
-                el.setAttribute("width", 320)
-                el.setAttribute("height", 240)
+                el.setAttribute("width", 440)
+                el.setAttribute("height", 330)
+                el.classList.add("remote_video")
                 document.getElementById('remoteVideos').appendChild(el)
 
                 event.track.onmute = function (event) {
@@ -354,7 +389,7 @@
 
                         pc.addIceCandidate(candidate)
                         return
-                        
+
                     case 'user-message':
                         console.log("received user message", msg)
                         handleTextStream(msg)
