@@ -62,9 +62,13 @@ func ServeWs(roomsService *rooms.Rooms, w http.ResponseWriter, r *http.Request) 
 		if ok {
 			room = val
 			peerConnection, err = room.SFU.CreatePeerConnection()
-			message := &websocketClient.WebsocketMessage{}
+			message := &websocketClient.JoinRoomWebsocketMessage{}
 			message.Event = "joined-room"
-			message.Data = room.ID
+			message.Data = websocketClient.JoinRoomData{
+				ChatLog: room.ChatLog,
+				RoomID:  room.ID,
+			}
+
 			wsClient.Writer.WriteJSON(message)
 			if err != nil {
 				log.Println(err)
@@ -75,8 +79,6 @@ func ServeWs(roomsService *rooms.Rooms, w http.ResponseWriter, r *http.Request) 
 			// Handle error
 		}
 	}
-
-	// Adding peer connection is hard
 
 	room.SFU.ListLock.Lock()
 	room.SFU.PeerConnections = append(room.SFU.PeerConnections, sfu.PeerConnectionState{PeerConnection: peerConnection, Websocket: wsClient.Writer})
@@ -173,6 +175,7 @@ func ServeWs(roomsService *rooms.Rooms, w http.ResponseWriter, r *http.Request) 
 					log.Println(err)
 				}
 			}
+			room.ChatLog = append(room.ChatLog, message.Data)
 		}
 	}
 }

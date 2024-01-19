@@ -20,6 +20,9 @@
         }
 
         #log {
+            display: flex;
+            flex-direction: column;
+            justify-content: end;
             background: white;
             height: 100%;
             /* margin: 0; */
@@ -270,6 +273,8 @@
 <script>
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
+            const log = document.getElementById("log")
+
             let pc = new RTCPeerConnection()
             pc.ontrack = function (event) {
                 if (event.track.kind === 'audio') {
@@ -323,14 +328,13 @@
 
             function handleTextStream(msg) {
                 const message = msg.data;
-                var item = document.createElement("div");
-                item.innerText = message;
-                appendLog(item);
+                appendLog(message);
             }
 
 
-            function appendLog(item) {
-                const log = document.getElementById("log")
+            function appendLog(message) {
+                const item = document.createElement("div");
+                item.innerText = message;
                 var doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
                 log.appendChild(item);
                 if (doScroll) {
@@ -401,6 +405,12 @@
                         return
                     case 'joined-room':
                         console.log("joined room ", msg.data)
+                        const chatLog = msg.data.chat_log
+                        let i = 0
+                        while (i < chatLog.length) {
+                            appendLog(chatLog[i])
+                            i = i + 1
+                        }
                 }
 
 

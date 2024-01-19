@@ -17,6 +17,16 @@ type WebsocketMessage struct {
 	Data  string `json:"data"`
 }
 
+type JoinRoomWebsocketMessage struct {
+	Event string       `json:"event"`
+	Data  JoinRoomData `json:"data"`
+}
+
+type JoinRoomData struct {
+	RoomID  string   `json:"room_id,omitempty"`
+	ChatLog []string `json:"chat_log,omitempty"`
+}
+
 // WebsocketClient maintains the set of active clients and broadcasts messages to the
 // clients.
 type WebsocketClient struct {
@@ -51,9 +61,4 @@ func (t *ThreadSafeWriter) WriteJSON(v interface{}) error {
 type ThreadSafeWriter struct {
 	*websocket.Conn
 	sync.Mutex
-}
-
-type websocketMessage struct {
-	Event string `json:"event"`
-	Data  string `json:"data"`
 }
