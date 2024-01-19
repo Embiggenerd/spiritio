@@ -24,7 +24,7 @@ type WebsocketClient struct {
 	Writer *ThreadSafeWriter
 }
 
-func NewWebsocketClient(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (*WebsocketClient, error) {
+func New(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (*WebsocketClient, error) {
 	unsafeConn, err := upgrader.Upgrade(w, r, responseHeader)
 	writer := &ThreadSafeWriter{unsafeConn, sync.Mutex{}}
 	client := &WebsocketClient{

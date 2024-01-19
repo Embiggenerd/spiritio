@@ -40,7 +40,7 @@
             bottom: 1em;
             left: 0px;
             width: 100%;
-            
+
             overflow: hidden;
         }
 
@@ -58,7 +58,7 @@
             display: flex;
             flex-direction: column;
             width: 100%;
-            height: 100% ;
+            height: 100%;
             align-items: center;
             justify-content: space-between;
         }
@@ -75,10 +75,10 @@
             width: 100%;
             aspect-ratio: 4 3;
         }
-        #remoteVideos{
+
+        #remoteVideos {
             /* width: 100%; */
         }
-
     </style>
 </head>
 
@@ -86,9 +86,9 @@
     <!-- <video id="localVideo" autoplay playsinline controls="false" /> -->
     <div class="container">
         <div class="video_audio">
-            <div id="remoteVideos"></div> 
+            <div id="remoteVideos"></div>
             <h3>You</h3>
-            <video id="localVideo" width="160" height="120" autoplay muted></video> 
+            <video id="localVideo" width="160" height="120" autoplay muted></video>
         </div>
         <div class="chat">
             <div id="log"></div>
@@ -303,7 +303,7 @@
             let ws = null;
 
             if (window["WebSocket"]) {
-                ws = new WebSocket(wsProtocol + document.location.host + "/ws");
+                ws = new WebSocket(wsProtocol + document.location.host + "/ws" + window.location.search);
             }
             document.getElementById("form").onsubmit = function (e) {
                 e.preventDefault()
@@ -367,7 +367,7 @@
                 if (!msg) {
                     return console.log('failed to parse msg')
                 }
-
+                console.log("message received", msg)
                 switch (msg.event) {
                     case 'offer':
                         let offer = JSON.parse(msg.data)
@@ -393,6 +393,14 @@
                     case 'user-message':
                         console.log("received user message", msg)
                         handleTextStream(msg)
+                        return
+                    case 'created-room':
+                        const urlParams = new URLSearchParams(window.location.search);
+                        urlParams.set('room', msg.data);
+                        window.location.search = urlParams;
+                        return
+                    case 'joined-room':
+                        console.log("joined room ", msg.data)
                 }
 
 

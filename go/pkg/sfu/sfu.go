@@ -6,26 +6,25 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Embiggenerd/spiritio/pkg/config"
 	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 )
 
-type SFU struct {
+type SFUService struct {
 	trackLocals map[string]*webrtc.TrackLocalStaticRTP
 	// lock for peerConnections and trackLocals
 	ListLock        sync.RWMutex
 	PeerConnections []PeerConnectionState
 }
 
-func NewSelectiveForwardingUnit(cfg *config.Config) *SFU {
-	s := &SFU{}
+func NewSelectiveForwardingUnit() *SFUService {
+	s := &SFUService{}
 	s.trackLocals = map[string]*webrtc.TrackLocalStaticRTP{}
 	return s
 }
 
-func (s *SFU) DispatchKeyFrame() {
+func (s *SFUService) DispatchKeyFrame() {
 	s.ListLock.Lock()
 	defer s.ListLock.Unlock()
 	for i := range s.PeerConnections {
@@ -44,7 +43,7 @@ func (s *SFU) DispatchKeyFrame() {
 	}
 }
 
-func (s *SFU) SignalPeerConnections() {
+func (s *SFUService) SignalPeerConnections() {
 	s.ListLock.Lock()
 	defer func() {
 		s.ListLock.Unlock()
@@ -58,7 +57,7 @@ func (s *SFU) SignalPeerConnections() {
 				return true // We modified the slice, start from the beginning
 			}
 
-			// map of sender we already are seanding, so we don't double send
+			// map of sender we already are sending, so we don't double send
 			existingSenders := map[string]bool{}
 
 			for _, sender := range s.PeerConnections[i].PeerConnection.GetSenders() {
@@ -95,7 +94,6 @@ func (s *SFU) SignalPeerConnections() {
 			}
 
 			offer, err := s.PeerConnections[i].PeerConnection.CreateOffer(nil)
-			// log.Println("### offer in signal ###", offer, err)
 			if err != nil {
 				return true
 			}
@@ -137,7 +135,7 @@ func (s *SFU) SignalPeerConnections() {
 }
 
 // Add to list of tracks and fire renegotation for all PeerConnections
-func (s *SFU) AddTrack(t *webrtc.TrackRemote) *webrtc.TrackLocalStaticRTP {
+func (s *SFUService) AddTrack(t *webrtc.TrackRemote) *webrtc.TrackLocalStaticRTP {
 	s.ListLock.Lock()
 	defer func() {
 		s.ListLock.Unlock()
@@ -154,7 +152,7 @@ func (s *SFU) AddTrack(t *webrtc.TrackRemote) *webrtc.TrackLocalStaticRTP {
 	return trackLocal
 }
 
-func (s *SFU) RemoveTrack(t *webrtc.TrackLocalStaticRTP) {
+func (s *SFUService) RemoveTrack(t *webrtc.TrackLocalStaticRTP) {
 	s.ListLock.Lock()
 	defer func() {
 		s.ListLock.Unlock()
@@ -167,4 +165,21 @@ func (s *SFU) RemoveTrack(t *webrtc.TrackLocalStaticRTP) {
 type PeerConnectionState struct {
 	PeerConnection *webrtc.PeerConnection
 	Websocket      *websocketClient.ThreadSafeWriter
+}
+
+func (s *SFUService) CreatePeerConnection() (*webrtc.PeerConnection, error) {
+	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		log.Print(err)
+		return peerConnection, err
+	}
+
+	for _, typ := range []webrtc.RTPCodecType{webrtc.RTPCodecTypeVideo, webrtc.RTPCodecTypeAudio} {
+		if _, err := peerConnection.AddTransceiverFromKind(typ, webrtc.RTPTransceiverInit{
+			Direction: webrtc.RTPTransceiverDirectionRecvonly,
+		}); err != nil {
+			return peerConnection, err
+		}
+	}
+	return peerConnection, err
 }

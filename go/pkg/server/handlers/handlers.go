@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Embiggenerd/spiritio/pkg/rooms"
 	"github.com/Embiggenerd/spiritio/pkg/sfu"
 	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
 	"github.com/pion/webrtc/v3"
@@ -23,35 +24,64 @@ import (
 // }
 
 // ServeWs handles websocket requests from the peer.
-func ServeWs(sfuService *sfu.SFU, w http.ResponseWriter, r *http.Request) {
-	// unsafeConn, err := upgrader.Upgrade(w, r, nil)
-	// writer, err := wsService.CreateWebsocketConnectionWriter(w, r, nil)
-	wsClient, err := websocketClient.NewWebsocketClient(w, r, nil)
+func ServeWs(roomsService *rooms.Rooms, w http.ResponseWriter, r *http.Request) {
+	// If user got here without roomID in param, we create a new room
+	// and attach references to that room
+
+	// Else, we use the roomID to get the room from RoomsTable, and use
+	// its reference to SFU
+
+	// Possible problem: when we broadcast to only peer connections in room,
+	// not a problem. However, if we send to the connection from browser,
+	// does everyone get it?
+
+	wsClient, err := websocketClient.New(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	defer wsClient.Conn.Close()
 
-	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer peerConnection.Close() //nolint
+	var room *rooms.Room
+	var peerConnection *webrtc.PeerConnection
+	roomID := r.URL.Query().Get("room")
+	log.Println("******* ", roomID, " ********")
+	if roomID == "" {
+		// send create room message
+		room = roomsService.CreateRoom()
+		log.Print("created room", room.ID)
+		peerConnection = room.Host
+		message := &websocketClient.WebsocketMessage{}
+		message.Event = "created-room"
+		message.Data = room.ID
+		wsClient.Writer.WriteJSON(message)
+	} else {
+		val, ok := roomsService.RoomsTable[roomID]
+		// log.Print("joining room", room.ID)
 
-	for _, typ := range []webrtc.RTPCodecType{webrtc.RTPCodecTypeVideo, webrtc.RTPCodecTypeAudio} {
-		if _, err := peerConnection.AddTransceiverFromKind(typ, webrtc.RTPTransceiverInit{
-			Direction: webrtc.RTPTransceiverDirectionRecvonly,
-		}); err != nil {
-			log.Print(err)
-			return
+		if ok {
+			room = val
+			peerConnection, err = room.SFU.CreatePeerConnection()
+			message := &websocketClient.WebsocketMessage{}
+			message.Event = "joined-room"
+			message.Data = room.ID
+			wsClient.Writer.WriteJSON(message)
+			if err != nil {
+				log.Println(err)
+				// Handle error
+			}
+		} else {
+			log.Printf("room with key %s doesn't exist", roomID)
+			// Handle error
 		}
 	}
 
-	sfuService.ListLock.Lock()
-	sfuService.PeerConnections = append(sfuService.PeerConnections, sfu.PeerConnectionState{PeerConnection: peerConnection, Websocket: wsClient.Writer})
-	sfuService.ListLock.Unlock()
+	// Adding peer connection is hard
+
+	room.SFU.ListLock.Lock()
+	room.SFU.PeerConnections = append(room.SFU.PeerConnections, sfu.PeerConnectionState{PeerConnection: peerConnection, Websocket: wsClient.Writer})
+	room.SFU.ListLock.Unlock()
+
 	peerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
 		if i == nil {
 			return
@@ -63,7 +93,7 @@ func ServeWs(sfuService *sfu.SFU, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if writeErr := wsClient.Conn.WriteJSON(&websocketClient.WebsocketMessage{
+		if writeErr := wsClient.Writer.WriteJSON(&websocketClient.WebsocketMessage{
 			Event: "candidate",
 			Data:  string(candidateString),
 		}); writeErr != nil {
@@ -71,7 +101,6 @@ func ServeWs(sfuService *sfu.SFU, w http.ResponseWriter, r *http.Request) {
 		}
 	})
 
-	// If PeerConnection is closed remove it from global list
 	peerConnection.OnConnectionStateChange(func(p webrtc.PeerConnectionState) {
 		switch p {
 		case webrtc.PeerConnectionStateFailed:
@@ -79,15 +108,16 @@ func ServeWs(sfuService *sfu.SFU, w http.ResponseWriter, r *http.Request) {
 				log.Print(err)
 			}
 		case webrtc.PeerConnectionStateClosed:
-			sfuService.SignalPeerConnections()
+			room.SFU.SignalPeerConnections()
 		default:
 		}
 	})
+	// End
 
 	peerConnection.OnTrack(func(t *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
 		// Create a track to fan out our incoming video to all peers
-		trackLocal := sfuService.AddTrack(t)
-		defer sfuService.RemoveTrack(trackLocal)
+		trackLocal := room.SFU.AddTrack(t)
+		defer room.SFU.RemoveTrack(trackLocal)
 
 		buf := make([]byte, 1500)
 		for {
@@ -102,13 +132,11 @@ func ServeWs(sfuService *sfu.SFU, w http.ResponseWriter, r *http.Request) {
 		}
 	})
 
-	sfuService.SignalPeerConnections()
-	log.Println("^^sfuService.ListLock.Unlock()")
+	room.SFU.SignalPeerConnections()
 
 	message := &websocketClient.WebsocketMessage{}
 	for {
 		_, raw, err := wsClient.Conn.ReadMessage()
-		log.Println("new message, * ", string(raw[:]), err)
 		if err != nil {
 			log.Println(err)
 			return
@@ -116,12 +144,9 @@ func ServeWs(sfuService *sfu.SFU, w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			return
 		}
-		log.Println("msg", message)
-
 		switch message.Event {
 		case "candidate":
 			candidate := webrtc.ICECandidateInit{}
-			log.Printf(`Sending cadidate %v`, candidate)
 			if err := json.Unmarshal([]byte(message.Data), &candidate); err != nil {
 				log.Println(err)
 				return
@@ -133,8 +158,6 @@ func ServeWs(sfuService *sfu.SFU, w http.ResponseWriter, r *http.Request) {
 			}
 		case "answer":
 			answer := webrtc.SessionDescription{}
-			log.Printf(`Sending answer %v`, answer)
-
 			if err := json.Unmarshal([]byte(message.Data), &answer); err != nil {
 				log.Println(err)
 				return
@@ -144,18 +167,12 @@ func ServeWs(sfuService *sfu.SFU, w http.ResponseWriter, r *http.Request) {
 				log.Println(err)
 				return
 			}
-
 		case "user-message":
-			log.Printf("writing message: %s", message.Data)
-			for i := range sfuService.PeerConnections {
-				if err = sfuService.PeerConnections[i].Websocket.WriteJSON(message); err != nil {
+			for i := range room.SFU.PeerConnections {
+				if err = room.SFU.PeerConnections[i].Websocket.WriteJSON(message); err != nil {
 					log.Println(err)
 				}
 			}
 		}
 	}
-
-	// Allow collection of memory referenced by the caller by doing all work in
-	// new goroutines.
-
 }
