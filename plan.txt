@@ -7,3 +7,10 @@
 
 Goodie bag:
 SFU -> MCU when too many streams.
+
+
+Logging strategy:
+1. Top level logger goes into services, logs time to init, error, and also logs up listening event of server.
+2. Each service creats a new context, and adds to ContextLogger struct and logs every event.
+
+TODO: figure out if we can use main context for everything.

@@ -1,6 +1,7 @@
 package websocketClient
 
 import (
+	"context"
 	"net/http"
 	"sync"
 
@@ -12,21 +13,6 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-type WebsocketMessage struct {
-	Event string `json:"event"`
-	Data  string `json:"data"`
-}
-
-type JoinRoomWebsocketMessage struct {
-	Event string       `json:"event"`
-	Data  JoinRoomData `json:"data"`
-}
-
-type JoinRoomData struct {
-	RoomID  string   `json:"room_id,omitempty"`
-	ChatLog []string `json:"chat_log,omitempty"`
-}
-
 // WebsocketClient maintains the set of active clients and broadcasts messages to the
 // clients.
 type WebsocketClient struct {
@@ -34,7 +20,7 @@ type WebsocketClient struct {
 	Writer *ThreadSafeWriter
 }
 
-func New(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (*WebsocketClient, error) {
+func New(ctx context.Context, w http.ResponseWriter, r *http.Request, responseHeader http.Header) (*WebsocketClient, error) {
 	unsafeConn, err := upgrader.Upgrade(w, r, responseHeader)
 	writer := &ThreadSafeWriter{unsafeConn, sync.Mutex{}}
 	client := &WebsocketClient{
@@ -54,11 +40,25 @@ func New(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (*W
 func (t *ThreadSafeWriter) WriteJSON(v interface{}) error {
 	t.Lock()
 	defer t.Unlock()
-
 	return t.Conn.WriteJSON(v)
 }
 
 type ThreadSafeWriter struct {
 	*websocket.Conn
 	sync.Mutex
+}
+
+type WebsocketMessage struct {
+	Event string `json:"event"`
+	Data  string `json:"data"`
+}
+
+type JoinRoomWebsocketMessage struct {
+	Event string       `json:"event"`
+	Data  JoinRoomData `json:"data"`
+}
+
+type JoinRoomData struct {
+	RoomID  uint     `json:"room_id,omitempty"`
+	ChatLog []string `json:"chat_log,omitempty"`
 }

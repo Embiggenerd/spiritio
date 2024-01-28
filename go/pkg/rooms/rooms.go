@@ -1,69 +1,68 @@
 package rooms
 
-// Rooms map always exists
-// If visited /ws with no room id, create room, redirect to ?room=abc
-
-// Create unique room name
-// UUID => check if exists
-
-// Room has sfu service, which contains peers and their websocket conns
-// Log of chats
-
-// Host peer
-
-// Sends a message to frontend :
-// {"event":"joined room", "data": "abc"}
-// Event forces frontend to change url + text
-
-// When host leaves, room is closed and all connections severed, room deleted
-
 import (
-	"log"
-	"time"
+	"context"
 
-	"github.com/Embiggenerd/spiritio/pkg/sfu"
-	"github.com/google/uuid"
-	"github.com/pion/webrtc/v3"
+	"github.com/Embiggenerd/spiritio/pkg/config"
+	"github.com/Embiggenerd/spiritio/pkg/db"
 )
 
-type Rooms struct {
-	RoomsTable
-}
-
-func Init() *Rooms {
+func NewRoomsService(ctx context.Context, cfg *config.Config, db *db.Database) RoomsService {
+	db.DB.AutoMigrate(&ChatRoom{})
+	db.DB.AutoMigrate(&ChatRoomLog{})
 	roomsTable := make(RoomsTable)
-	rooms := &Rooms{
-		RoomsTable: roomsTable,
+	rooms := &ChatRoomsService{
+		cache:       &RoomsCache{table: roomsTable},
+		DB:          db,
+		RoomStorage: &RoomStorage{db: db},
+		ChatStorage: &ChatLogStorage{db: db},
 	}
 	return rooms
 }
 
-type Room struct {
-	ID      string
-	Host    *webrtc.PeerConnection
-	ChatLog []string
-	SFU     *sfu.SFUService
+type RoomsService interface {
+	CreateRoom(ctx context.Context) (*ChatRoom, error)
+	GetRoomByID(roomID uint) (*ChatRoom, error)
+	SaveChatLog(text string, room *ChatRoom) error
 }
 
-func (r *Rooms) CreateRoom() *Room {
-	id := uuid.New()
-	room := &Room{
-		ID:  id.String(),
-		SFU: sfu.NewSelectiveForwardingUnit(),
-	}
-	r.RoomsTable[id.String()] = room
-	peerConnection, err := room.SFU.CreatePeerConnection()
+type ChatRoomsService struct {
+	cache       Cache
+	DB          *db.Database
+	RoomStorage RoomStore
+	ChatStorage ChatLogStore
+}
+
+// CreateRoom creates a new room
+func (r *ChatRoomsService) CreateRoom(ctx context.Context) (*ChatRoom, error) {
+	newRoom, err := r.RoomStorage.CreateRoom(ctx)
 	if err != nil {
-		log.Println(err)
+		return newRoom, err
 	}
-	room.Host = peerConnection
-	defer peerConnection.Close() //nolint
-	go func() {
-		for range time.NewTicker(time.Second * 3).C {
-			room.SFU.DispatchKeyFrame()
-		}
-	}()
-	return room
+
+	newRoom.Build()
+
+	r.cache.AddRoom(newRoom)
+	return newRoom, err
 }
 
-type RoomsTable map[string]*Room
+func (r *ChatRoomsService) GetRoomByID(roomID uint) (*ChatRoom, error) {
+	room, err := r.cache.GetRoom(roomID)
+	if err != nil {
+		room, err = r.RoomStorage.FindRoomByID(roomID)
+		if err != nil {
+			return room, err
+		}
+		chatLog, _ := r.ChatStorage.GetChatLogsByRoomID(roomID)
+		room.ChatLog = chatLog
+		room.Build()
+		r.cache.AddRoom(room)
+	}
+	return room, err
+}
+
+func (s *ChatRoomsService) SaveChatLog(text string, room *ChatRoom) error {
+	chatRoomLog, err := s.ChatStorage.SaveChatlog(text, room)
+	s.cache.UpdateChatLogs(room.ID, chatRoomLog)
+	return err
+}

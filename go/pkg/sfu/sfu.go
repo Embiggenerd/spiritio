@@ -11,9 +11,12 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
+type SFU interface {
+	AddPeerConnection(pc *webrtc.PeerConnection)
+}
+
 type SFUService struct {
-	trackLocals map[string]*webrtc.TrackLocalStaticRTP
-	// lock for peerConnections and trackLocals
+	trackLocals     map[string]*webrtc.TrackLocalStaticRTP
 	ListLock        sync.RWMutex
 	PeerConnections []PeerConnectionState
 }
@@ -38,7 +41,9 @@ func (s *SFUService) DispatchKeyFrame() {
 					MediaSSRC: uint32(receiver.Track().SSRC()),
 				},
 			})
-			log.Println(err)
+			if err != nil {
+				log.Println(err)
+			}
 		}
 	}
 }

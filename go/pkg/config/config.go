@@ -1,8 +1,6 @@
 package config
 
 import (
-	"log"
-	"os"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -23,13 +21,13 @@ type websocketConfig struct {
 }
 
 type Config struct {
-	hi string
+	DatabaseName string
 }
 
 func GetConfig() *Config {
 	err := godotenv.Load("config.env")
 	if err != nil {
-		log.Println(err)
+		// log.Println(err)
 		// log.Fatal("Error loading .env file")
 
 	}
@@ -52,7 +50,7 @@ func GetConfig() *Config {
 	// log.Println("&&&", hi)
 	// secretKey := os.Getenv("SECRET_KEY")
 	cfg := Config{
-		hi: os.Getenv("hi"),
+		DatabaseName: "dev.db",
 	}
 	return &cfg
 }
