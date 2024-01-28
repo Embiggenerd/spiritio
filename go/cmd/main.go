@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -28,7 +27,6 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-
 	ctx, cancel := context.WithCancel(utils.WithMetadata(context.Background()))
 	defer cancel()
 
@@ -46,7 +44,6 @@ func main() {
 		Addr:              cfg.Addr,
 		ReadHeaderTimeout: 3 * time.Second,
 	}
-	fmt.Println("^^^^^", server.Addr)
 	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
