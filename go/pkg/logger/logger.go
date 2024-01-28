@@ -24,7 +24,7 @@ type Logger interface {
 
 // NewLoggerService creates and returns a new Logger instance
 func NewLoggerService(ctx context.Context, cfg *config.Config) Logger {
-	file, _ := os.OpenFile("logs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, constants.OS_ALL_R)
+	file, _ := os.OpenFile("pkg/logger/"+cfg.LogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, constants.OS_ALL_R)
 	stderr := os.Stderr
 
 	slogger := slog.New(

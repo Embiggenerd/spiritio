@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Embiggenerd/spiritio/pkg/config"
 	"github.com/Embiggenerd/spiritio/pkg/logger"
@@ -16,7 +17,8 @@ type Database struct {
 }
 
 func Init(ctx context.Context, cfg *config.Config, log logger.Logger) (*Database, error) {
-	db, err := gorm.Open(sqlite.Open("dev.db"), &gorm.Config{})
+	fmt.Println("cfg.DatabaseName" + cfg.DatabaseName)
+	db, err := gorm.Open(sqlite.Open("pkg/db/data/"+cfg.DatabaseName), &gorm.Config{})
 	if err != nil {
 		log.Fatal(err.Error())
 	}

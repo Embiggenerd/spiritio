@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -15,8 +15,6 @@ import (
 	"github.com/Embiggenerd/spiritio/pkg/utils"
 )
 
-var addr = flag.String("addr", ":8080", "http service address")
-
 func serveHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.Error(w, "Not found", http.StatusNotFound)
@@ -26,11 +24,10 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	http.ServeFile(w, r, "../static/index.html")
+	http.ServeFile(w, r, "static/index.html")
 }
 
 func main() {
-	flag.Parse()
 
 	ctx, cancel := context.WithCancel(utils.WithMetadata(context.Background()))
 	defer cancel()
@@ -46,9 +43,10 @@ func main() {
 	})
 
 	server := &http.Server{
-		Addr:              *addr,
+		Addr:              cfg.Addr,
 		ReadHeaderTimeout: 3 * time.Second,
 	}
+	fmt.Println("^^^^^", server.Addr)
 	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
