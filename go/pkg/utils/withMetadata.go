@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sync"
 )
 
@@ -36,11 +35,13 @@ func (l *Metadata) Get(key string) (interface{}, error) {
 	return value.Value, err
 }
 
-func (l *Metadata) ToJSON() string {
-	b, err := json.MarshalIndent(l.metadata, "", "  ")
-	if err != nil {
-		fmt.Println("error:", err)
+func (m *Metadata) ToJSON() string {
+	jsonMap := map[string]interface{}{}
+	for key, val := range m.metadata {
+		jsonMap[key] = val.Value
 	}
+	b, _ := json.Marshal(jsonMap)
+
 	return string(b)
 }
 

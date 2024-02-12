@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/Embiggenerd/spiritio/pkg/logger"
+	"github.com/Embiggenerd/spiritio/pkg/utils"
+	"github.com/Embiggenerd/spiritio/types"
 	"github.com/gorilla/websocket"
 )
 
@@ -20,9 +23,18 @@ type WebsocketClient struct {
 	Writer *ThreadSafeWriter
 }
 
-func New(ctx context.Context, w http.ResponseWriter, r *http.Request, responseHeader http.Header) (*WebsocketClient, error) {
+func New(ctx context.Context, log logger.Logger, w http.ResponseWriter, r *http.Request, responseHeader http.Header) (*WebsocketClient, error) {
 	unsafeConn, err := upgrader.Upgrade(w, r, responseHeader)
-	writer := &ThreadSafeWriter{unsafeConn, sync.Mutex{}}
+	if err != nil {
+		log.Error(err.Error())
+		return nil, err
+	}
+	writer := &ThreadSafeWriter{
+		unsafeConn,
+		sync.Mutex{},
+		ctx,
+		log,
+	}
 	client := &WebsocketClient{
 		Conn:   writer.Conn,
 		Writer: writer,
@@ -30,27 +42,21 @@ func New(ctx context.Context, w http.ResponseWriter, r *http.Request, responseHe
 	return client, err
 }
 
-// // CreateWebsocketConnectionWriter upgrades a connection, wraps it in a lockable
-// func (wss *WebsocketClient) CreateWebsocketConnectionWriter(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (*ThreadSafeWriter, error) {
-// 	unsafeConn, err := upgrader.Upgrade(w, r, responseHeader)
-// 	writer := &ThreadSafeWriter{unsafeConn, sync.Mutex{}}
-// 	return writer, err
-// }
-
 func (t *ThreadSafeWriter) WriteJSON(v interface{}) error {
 	t.Lock()
 	defer t.Unlock()
+	md := utils.ExposeContextMetadata(t.ctx)
+	mdJSON := md.ToJSON()
+	reqID, _ := md.Get("requestID")
+	t.log.LogEventSent(reqID.(string), mdJSON, v.(*types.WebsocketMessage))
 	return t.Conn.WriteJSON(v)
 }
 
 type ThreadSafeWriter struct {
 	*websocket.Conn
 	sync.Mutex
-}
-
-type WebsocketMessage struct {
-	Event string `json:"event"`
-	Data  string `json:"data"`
+	ctx context.Context
+	log logger.Logger
 }
 
 type JoinRoomWebsocketMessage struct {

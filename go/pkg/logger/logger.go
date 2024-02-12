@@ -2,12 +2,21 @@ package logger
 
 import (
 	"context"
+	"encoding/json"
+	"log"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/Embiggenerd/spiritio/pkg/config"
 	"github.com/Embiggenerd/spiritio/pkg/constants"
+	"github.com/Embiggenerd/spiritio/pkg/utils"
+	"github.com/Embiggenerd/spiritio/types"
+	"github.com/google/uuid"
 	slogmulti "github.com/samber/slog-multi"
+	"github.com/urfave/negroni"
 )
 
 const (
@@ -20,21 +29,31 @@ type Logger interface {
 	Debug(msg string, args ...any)
 	Error(msg string, args ...any)
 	Info(msg string, args ...any)
+	LoggingMW(next http.Handler) http.Handler
+	LogAPIRequest(id, ip, path, port, method string, timeRecieved time.Time, nanoSeconds int64, statusCode int)
+	LogRequestError(requestID, errorMessage string, statusCode int)
+	logEvent(requestID, metadata, direction, event, data string)
+	LogEventSent(requestID, metadata string, message *types.WebsocketMessage)
+	LogEventReceived(requestID, metadata string, message *types.WebsocketMessage)
 }
 
 // NewLoggerService creates and returns a new Logger instance
 func NewLoggerService(ctx context.Context, cfg *config.Config) Logger {
-	file, _ := os.OpenFile("pkg/logger/"+cfg.LogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, constants.OS_ALL_R)
+	file, err := os.OpenFile("pkg/logger/"+cfg.LogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, constants.OS_ALL_RW)
+	if err != nil {
+		log.Println(err.Error())
+		return nil
+	}
 	stderr := os.Stderr
 
 	slogger := slog.New(
 		slogmulti.Fanout(
-			slog.NewJSONHandler(file, &slog.HandlerOptions{}),   // pass to first handler: logstash over tcp
-			slog.NewTextHandler(stderr, &slog.HandlerOptions{}), // then to second handler: stderr
+			slog.NewJSONHandler(file, &slog.HandlerOptions{}),
+			slog.NewTextHandler(stderr, &slog.HandlerOptions{}),
 		),
 	)
 	logger := &CustomLogger{Logger: slogger}
-	logger.Info("Service Up")
+	logger.Info("logging service Up")
 	return logger
 }
 
@@ -49,17 +68,84 @@ func (l *CustomLogger) Fatal(msg string) {
 	os.Exit(1)
 }
 
-// type NewJSONHandlerWithMetadata struct {
-// 	slog.JSONHandler
-// }
+func (l *CustomLogger) LoggingMW(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithCancel(utils.WithMetadata(context.Background()))
+		defer cancel()
 
-// func (h *NewJSONHandlerWithMetadata) Handle(ctx context.Context, r slog.Record) error {
-// 	// We are adding all of the metadata as a json value on our slog handler
-// 	md := utils.ExposeContextMetadata(ctx).ToJSON()
-// 	attr := slog.String(string(utils.Metadata_name), md)
-// 	r.AddAttrs(attr)
+		method := r.Method
+		path := r.URL.EscapedPath()
+		ip, port, _ := net.SplitHostPort(r.RemoteAddr)
+		lrw := negroni.NewResponseWriter(w)
+		newUUID := uuid.New()
 
-// 	// We check if there is a databa
+		utils.ExposeContextMetadata(ctx).Set("requestID", newUUID.String())
 
-// 	return h.JSONHandler.Handle(ctx, r)
-// }
+		next.ServeHTTP(w, r.WithContext(ctx))
+
+		statusCode := lrw.Status()
+
+		defer func(begin time.Time) {
+			tookMs := time.Since(begin).Nanoseconds()
+			l.LogAPIRequest(newUUID.String(), ip, path, port, method, time.Now(), tookMs, statusCode)
+		}(time.Now())
+	})
+}
+
+func (l *CustomLogger) LogAPIRequest(id, ip, path, port, method string, timeRecieved time.Time, nanoSeconds int64, statusCode int) {
+	level := slog.LevelInfo
+	if statusCode >= 400 {
+		level = slog.LevelError
+	}
+	l.Log(nil, level, "API Request",
+		slog.String("requestID", id),
+		slog.Int("statusCode", statusCode),
+		slog.String("ip", ip),
+		slog.String("path", path),
+		slog.String("port", port),
+		slog.String("method", method),
+		slog.Int64("nanoSeconds", nanoSeconds),
+		slog.Time("timeReceived", timeRecieved))
+}
+
+func (l *CustomLogger) LogRequestError(requestID, errorMessage string, statusCode int) {
+	l.Log(
+		nil,
+		slog.LevelError,
+		"Request Error",
+		slog.String("requestID", requestID),
+		slog.String("errorMessage", errorMessage),
+		slog.Int("statusCode", statusCode),
+	)
+}
+
+func (l *CustomLogger) LogEventSent(requestID, metadata string, message *types.WebsocketMessage) {
+	d, err := json.Marshal(message.Data)
+	if err != nil {
+		l.Error(err.Error())
+		return
+	}
+
+	l.logEvent(requestID, metadata, "Sent", message.Event, string(d))
+}
+
+func (l *CustomLogger) LogEventReceived(requestID, metadata string, message *types.WebsocketMessage) {
+	d, err := json.Marshal(message.Data)
+	if err != nil {
+		l.Error(err.Error())
+		return
+	}
+
+	l.logEvent(requestID, metadata, "Received", message.Event, string(d))
+}
+func (l *CustomLogger) logEvent(requestID, metadata, direction, event, data string) {
+	l.Log(
+		nil,
+		slog.LevelInfo,
+		"Event Message "+direction,
+		slog.String("requestID", requestID),
+		slog.String("event", event),
+		slog.String("data", data),
+		slog.String("metadata", metadata),
+	)
+}

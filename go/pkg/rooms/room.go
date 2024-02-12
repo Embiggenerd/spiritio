@@ -14,15 +14,13 @@ type Room interface {
 }
 
 type ChatRoom struct {
-	ID      uint            `gorm:"primaryKey"`
-	SFU     *sfu.SFUService `gorm:"-:all"`
-	ChatLog *[]ChatRoomLog  `gorm:"-:all"`
+	ID      uint           `gorm:"primaryKey"`
+	SFU     sfu.SFU        `gorm:"-:all"`
+	ChatLog *[]ChatRoomLog `gorm:"-:all"`
 }
 
 func (r *ChatRoom) AddPeerConnection(pc *webrtc.PeerConnection, w *websocketClient.ThreadSafeWriter) {
-	r.SFU.ListLock.Lock()
-	r.SFU.PeerConnections = append(r.SFU.PeerConnections, sfu.PeerConnectionState{PeerConnection: pc, Websocket: w})
-	r.SFU.ListLock.Unlock()
+	r.SFU.AddPeerConnection(pc, w)
 }
 
 func (r *ChatRoom) Build() {

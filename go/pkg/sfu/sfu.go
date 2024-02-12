@@ -7,12 +7,19 @@ import (
 	"time"
 
 	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
+	"github.com/Embiggenerd/spiritio/types"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 )
 
 type SFU interface {
-	AddPeerConnection(pc *webrtc.PeerConnection)
+	AddPeerConnection(pc *webrtc.PeerConnection, w *websocketClient.ThreadSafeWriter)
+	DispatchKeyFrame()
+	SignalPeerConnections()
+	AddTrack(t *webrtc.TrackRemote) *webrtc.TrackLocalStaticRTP
+	RemoveTrack(t *webrtc.TrackLocalStaticRTP)
+	CreatePeerConnection() (*webrtc.PeerConnection, error)
+	BroadcastMessage(message *types.WebsocketMessage)
 }
 
 type SFUService struct {
@@ -21,10 +28,25 @@ type SFUService struct {
 	PeerConnections []PeerConnectionState
 }
 
-func NewSelectiveForwardingUnit() *SFUService {
+func NewSelectiveForwardingUnit() SFU {
 	s := &SFUService{}
 	s.trackLocals = map[string]*webrtc.TrackLocalStaticRTP{}
 	return s
+}
+
+func (s *SFUService) AddPeerConnection(pc *webrtc.PeerConnection, w *websocketClient.ThreadSafeWriter) {
+	s.ListLock.Lock()
+	s.PeerConnections = append(s.PeerConnections, PeerConnectionState{PeerConnection: pc, Websocket: w})
+	s.ListLock.Unlock()
+}
+
+func (s *SFUService) BroadcastMessage(message *types.WebsocketMessage) {
+	// Send message to each client subbed to this peer's peerConnections
+	for i := range s.PeerConnections {
+		if err := s.PeerConnections[i].Websocket.WriteJSON(message); err != nil {
+			// log.Error(err.Error())
+		}
+	}
 }
 
 func (s *SFUService) DispatchKeyFrame() {
@@ -112,7 +134,7 @@ func (s *SFUService) SignalPeerConnections() {
 				return true
 			}
 
-			if err = s.PeerConnections[i].Websocket.WriteJSON(&websocketClient.WebsocketMessage{
+			if err = s.PeerConnections[i].Websocket.WriteJSON(&types.WebsocketMessage{
 				Event: "offer",
 				Data:  string(offerString),
 			}); err != nil {

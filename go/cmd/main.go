@@ -2,15 +2,13 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
-	"time"
 
 	"github.com/Embiggenerd/spiritio/pkg/config"
 	"github.com/Embiggenerd/spiritio/pkg/db"
 	"github.com/Embiggenerd/spiritio/pkg/logger"
 	"github.com/Embiggenerd/spiritio/pkg/rooms"
-	"github.com/Embiggenerd/spiritio/pkg/server/handlers"
+	"github.com/Embiggenerd/spiritio/pkg/server"
 	"github.com/Embiggenerd/spiritio/pkg/utils"
 )
 
@@ -32,20 +30,9 @@ func main() {
 
 	cfg := config.GetConfig()
 	logger := logger.NewLoggerService(ctx, cfg)
-	db, err := db.Init(ctx, cfg, logger)
-	rooms := rooms.NewRoomsService(ctx, cfg, db)
+	db := db.Init(ctx, cfg, logger)
+	roomsService := rooms.NewRoomsService(ctx, cfg, logger, db)
+	apiServer := server.NewServer(ctx, cfg, logger, roomsService)
 
-	http.HandleFunc("/", serveHome)
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		handlers.ServeWs(rooms, w, r)
-	})
-
-	server := &http.Server{
-		Addr:              cfg.Addr,
-		ReadHeaderTimeout: 3 * time.Second,
-	}
-	err = server.ListenAndServe()
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
+	apiServer.Run()
 }

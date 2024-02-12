@@ -271,6 +271,9 @@
     //     })(); 
 </script>
 <script>
+    const wsProtocol2 = document.location.hostname.includes("localhost") ? "ws://" : "wss://"
+    const wsString = wsProtocol2 + document.location.host + "/ws" + window.location.search
+    console.log({ wsString })
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
             const log = document.getElementById("log")

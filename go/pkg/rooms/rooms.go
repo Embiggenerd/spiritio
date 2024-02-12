@@ -5,9 +5,10 @@ import (
 
 	"github.com/Embiggenerd/spiritio/pkg/config"
 	"github.com/Embiggenerd/spiritio/pkg/db"
+	"github.com/Embiggenerd/spiritio/pkg/logger"
 )
 
-func NewRoomsService(ctx context.Context, cfg *config.Config, db *db.Database) RoomsService {
+func NewRoomsService(ctx context.Context, cfg *config.Config, log logger.Logger, db *db.Database) RoomsService {
 	db.DB.AutoMigrate(&ChatRoom{})
 	db.DB.AutoMigrate(&ChatRoomLog{})
 	roomsTable := make(RoomsTable)
