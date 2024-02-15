@@ -16,7 +16,7 @@ type Database struct {
 }
 
 func Init(ctx context.Context, cfg *config.Config, log logger.Logger) *Database {
-	db, err := gorm.Open(sqlite.Open("pkg/db/data/"+cfg.DatabaseName), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("pkg/db/"+cfg.DatabaseName), &gorm.Config{})
 	if err != nil {
 		log.Fatal(err.Error())
 	}
