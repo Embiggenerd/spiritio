@@ -37,6 +37,14 @@ type Logger interface {
 	LogEventReceived(requestID, metadata string, message *types.WebsocketMessage)
 }
 
+// replaceAttr masks data from requests and metadata from context
+func replaceAttr(_ []string, a slog.Attr) slog.Attr {
+	if a.Key == "data" || a.Key == "metadata" {
+		a = slog.Attr{}
+	}
+	return a
+}
+
 // NewLoggerService creates and returns a new Logger instance
 func NewLoggerService(ctx context.Context, cfg *config.Config) Logger {
 	file, err := os.OpenFile("pkg/logger/"+cfg.LogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, constants.OS_ALL_RW)
@@ -44,12 +52,17 @@ func NewLoggerService(ctx context.Context, cfg *config.Config) Logger {
 		log.Println(err.Error())
 		return nil
 	}
-	stderr := os.Stderr
 
 	slogger := slog.New(
 		slogmulti.Fanout(
-			slog.NewJSONHandler(file, &slog.HandlerOptions{}),
-			slog.NewTextHandler(stderr, &slog.HandlerOptions{}),
+			slog.NewJSONHandler(file, &slog.HandlerOptions{
+				AddSource: true,
+			}),
+			NewPrettyHandler(&slog.HandlerOptions{
+				Level:       slog.LevelInfo,
+				AddSource:   false,
+				ReplaceAttr: replaceAttr,
+			}),
 		),
 	)
 	logger := &CustomLogger{Logger: slogger}
@@ -64,7 +77,7 @@ type CustomLogger struct {
 
 // Fatal logs a message and exits
 func (l *CustomLogger) Fatal(msg string) {
-	l.Log(nil, logFatal, "msg")
+	l.Log(context.TODO(), logFatal, "msg")
 	os.Exit(1)
 }
 
@@ -97,7 +110,7 @@ func (l *CustomLogger) LogAPIRequest(id, ip, path, port, method string, timeReci
 	if statusCode >= 400 {
 		level = slog.LevelError
 	}
-	l.Log(nil, level, "API Request",
+	l.Log(context.TODO(), level, "API Request",
 		slog.String("requestID", id),
 		slog.Int("statusCode", statusCode),
 		slog.String("ip", ip),
@@ -110,7 +123,7 @@ func (l *CustomLogger) LogAPIRequest(id, ip, path, port, method string, timeReci
 
 func (l *CustomLogger) LogRequestError(requestID, errorMessage string, statusCode int) {
 	l.Log(
-		nil,
+		context.TODO(),
 		slog.LevelError,
 		"Request Error",
 		slog.String("requestID", requestID),
@@ -140,7 +153,7 @@ func (l *CustomLogger) LogEventReceived(requestID, metadata string, message *typ
 }
 func (l *CustomLogger) logEvent(requestID, metadata, direction, event, data string) {
 	l.Log(
-		nil,
+		context.TODO(),
 		slog.LevelInfo,
 		"Event Message "+direction,
 		slog.String("requestID", requestID),
