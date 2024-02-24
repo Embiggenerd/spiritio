@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/Embiggenerd/spiritio/pkg/config"
 	"github.com/Embiggenerd/spiritio/pkg/logger"
 	"github.com/Embiggenerd/spiritio/pkg/rooms"
+	"github.com/Embiggenerd/spiritio/pkg/users"
 	"github.com/Embiggenerd/spiritio/pkg/utils"
 	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
 	"github.com/Embiggenerd/spiritio/types"
@@ -23,10 +25,11 @@ import (
 type APIServer struct {
 	server       *http.Server
 	roomsService rooms.RoomsService
+	userService  users.Users
 	log          logger.Logger
 }
 
-func NewServer(ctx context.Context, cfg *config.Config, log logger.Logger, roomsService rooms.RoomsService) *APIServer {
+func NewServer(ctx context.Context, cfg *config.Config, log logger.Logger, roomsService rooms.RoomsService, usersService users.Users) *APIServer {
 	server := &http.Server{
 		Addr:              cfg.Addr,
 		ReadHeaderTimeout: 3 * time.Second,
@@ -36,6 +39,7 @@ func NewServer(ctx context.Context, cfg *config.Config, log logger.Logger, rooms
 	return &APIServer{
 		server:       server,
 		roomsService: roomsService,
+		userService:  usersService,
 		log:          log,
 	}
 }
@@ -82,13 +86,17 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 	reqID, _ := metadata.Get("requestID")
 
 	wsClient, err := websocketClient.New(ctx, s.log, w, r, nil)
-	defer wsClient.Conn.Close()
+
 	if err != nil {
 		s.log.LogRequestError(reqID.(string), err.Error(), http.StatusInternalServerError)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
+	defer wsClient.Conn.Close()
+	// Block until user is either created or authenticated
+	userAuth := make(chan *users.User, 1)
+	user := <-userAuth
+	s.log.Info("user name: " + user.Name)
 	var room *rooms.ChatRoom
 	roomIDStr := r.URL.Query().Get("room")
 	if roomIDStr == "" {
@@ -153,12 +161,12 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 	}
 	// Create peer connection
 	peerConnection, err := room.SFU.CreatePeerConnection()
-	defer peerConnection.Close()
 	if err != nil {
 		s.log.Error(err.Error())
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	defer peerConnection.Close()
 
 	room.AddPeerConnection(peerConnection, wsClient.Writer)
 
@@ -230,6 +238,117 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 		}
 		s.log.LogEventReceived(reqID.(string), metadata.ToJSON(), message)
 		switch message.Event {
+		case "authentication":
+			if message.Data == nil || message.Data == "" {
+				fmt.Println("*&*&", message.Data)
+				message := &types.WebsocketMessage{
+					Event: "error",
+					Data:  http.StatusUnauthorized,
+				}
+				if err = wsClient.Writer.WriteJSON(message); err != nil {
+					s.log.Error(err.Error())
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				// create new user or ask for userName / password
+				user, token, err := s.userService.CreateUser(false)
+				if err != nil {
+					s.log.Error(err.Error())
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+				// Once we have created a user, we can write to the channel blocking the function
+
+				message = &types.WebsocketMessage{
+					Event: "authorization",
+					Data:  token,
+				}
+
+				if err = wsClient.Writer.WriteJSON(message); err != nil {
+					s.log.Error(err.Error())
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				message = &types.WebsocketMessage{
+					Event: "login",
+					Data: map[string]string{
+						"userName": user.Name,
+						"userID":   utils.UintToString(user.ID),
+					},
+				}
+
+				if err = wsClient.Writer.WriteJSON(message); err != nil {
+					s.log.Error(err.Error())
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				userAuth <- user
+
+			} else {
+				token, err := s.userService.ValidateAccessToken(message.Data.(string))
+				if err != nil {
+					s.log.Info("*&^", err)
+					message := &types.WebsocketMessage{
+						Event: "error",
+						Data:  401,
+					}
+					if err = wsClient.Writer.WriteJSON(message); err != nil {
+						s.log.Error(err.Error())
+						http.Error(w, "Internal server error", http.StatusInternalServerError)
+						return
+					}
+				}
+
+				user, err := s.userService.GetUserFromAccessToken(token)
+				if err != nil {
+					s.log.Error(err.Error())
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+				newToken, err := s.userService.CreateAccessToken(user)
+				if err != nil {
+					s.log.Error(err.Error())
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				message := &types.WebsocketMessage{
+					Event: "authorization",
+					Data:  newToken,
+				}
+
+				if err = wsClient.Writer.WriteJSON(message); err != nil {
+					s.log.Error(err.Error())
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				message = &types.WebsocketMessage{
+					Event: "login",
+					Data:  user,
+				}
+				if err = wsClient.Writer.WriteJSON(message); err != nil {
+					s.log.Error(err.Error())
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				userAuth <- user
+			}
+			// data := &struct {
+			// 	Bearer *jwt.Token
+			// }{}
+
+			// if err := json.Unmarshal(message.Data, &data); err != nil {
+			// 	s.log.Error(err.Error())
+			// 	http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// 	return
+			// }
+			// s.log.Info(string(data))
+
 		case "candidate":
 			candidate := webrtc.ICECandidateInit{}
 			if err := json.Unmarshal([]byte(message.Data.(string)), &candidate); err != nil {

@@ -16,19 +16,15 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-// WebsocketClient maintains the set of active clients and broadcasts messages to the
-// clients.
+// WebsocketClient exposes a websocket connection and a custom writer to write to the conneciton
 type WebsocketClient struct {
 	Conn   *websocket.Conn
 	Writer *ThreadSafeWriter
 }
 
+// New upgrades an http connection to ws and
 func New(ctx context.Context, log logger.Logger, w http.ResponseWriter, r *http.Request, responseHeader http.Header) (*WebsocketClient, error) {
 	unsafeConn, err := upgrader.Upgrade(w, r, responseHeader)
-	if err != nil {
-		log.Error(err.Error())
-		return nil, err
-	}
 	writer := &ThreadSafeWriter{
 		unsafeConn,
 		sync.Mutex{},
@@ -45,10 +41,12 @@ func New(ctx context.Context, log logger.Logger, w http.ResponseWriter, r *http.
 func (t *ThreadSafeWriter) WriteJSON(v interface{}) error {
 	t.Lock()
 	defer t.Unlock()
+
 	md := utils.ExposeContextMetadata(t.ctx)
 	mdJSON := md.ToJSON()
 	reqID, _ := md.Get("requestID")
 	t.log.LogEventSent(reqID.(string), mdJSON, v.(*types.WebsocketMessage))
+
 	return t.Conn.WriteJSON(v)
 }
 

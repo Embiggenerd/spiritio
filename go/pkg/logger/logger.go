@@ -60,7 +60,7 @@ func NewLoggerService(ctx context.Context, cfg *config.Config) Logger {
 			}),
 			NewPrettyHandler(&slog.HandlerOptions{
 				Level:       slog.LevelInfo,
-				AddSource:   false,
+				AddSource:   true,
 				ReplaceAttr: replaceAttr,
 			}),
 		),

@@ -18,16 +18,13 @@ type RoomStorage struct {
 
 // CreateRoom creates a new room
 func (r *RoomStorage) CreateRoom(ctx context.Context) (*ChatRoom, error) {
-	var err error
 	newRoom := &ChatRoom{}
 	roomResult := r.db.DB.Create(newRoom)
-	err = roomResult.Error
-	return newRoom, err
+	return newRoom, roomResult.Error
 }
 
 func (r *RoomStorage) FindRoomByID(roomID uint) (*ChatRoom, error) {
 	foundRoom := &ChatRoom{}
 	roomResult := r.db.DB.Where(ChatRoom{ID: roomID}).First(foundRoom)
-	err := roomResult.Error
-	return foundRoom, err
+	return foundRoom, roomResult.Error
 }

@@ -1,0 +1,18 @@
+asyncapi: 3.0.0
+info:
+  title: Spirit IO
+  version: '0.1.0'
+  description: 'An API for enabling live chat and video conferencing'
+channels:
+  hello:
+    address: 'hello'
+    messages:
+      sayHelloMessage:
+        payload:
+          type: string
+          pattern: '^hello .+$'
+operations:
+  receiveHello:
+    action: 'receive'
+    channel:
+      $ref: '#/channels/hello'

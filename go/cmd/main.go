@@ -9,6 +9,7 @@ import (
 	"github.com/Embiggenerd/spiritio/pkg/logger"
 	"github.com/Embiggenerd/spiritio/pkg/rooms"
 	"github.com/Embiggenerd/spiritio/pkg/server"
+	"github.com/Embiggenerd/spiritio/pkg/users"
 	"github.com/Embiggenerd/spiritio/pkg/utils"
 )
 
@@ -32,7 +33,8 @@ func main() {
 	logger := logger.NewLoggerService(ctx, cfg)
 	db := db.Init(ctx, cfg, logger)
 	roomsService := rooms.NewRoomsService(ctx, cfg, logger, db)
-	apiServer := server.NewServer(ctx, cfg, logger, roomsService)
+	usersService := users.NewUsersService(ctx, cfg, logger, db)
+	apiServer := server.NewServer(ctx, cfg, logger, roomsService, usersService)
 
 	apiServer.Run()
 }
