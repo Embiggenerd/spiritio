@@ -2,17 +2,171 @@ asyncapi: 3.0.0
 info:
   title: Spirit IO
   version: '0.1.0'
-  description: 'An API for enabling live chat and video conferencing'
+  description: "
+    An API for enabling live chat and video conferencing
+
+    ### Message types
+
+    - Since this is an event driven architecture, the first problem is how do we
+    treat messages sent between client and server.
+
+    - The lowest hanging fruit is to impose a request/reply philosophy, where
+    everything from the user is a request, and the server replies. If a user
+    broadcasts a message to a room of ten, are the other nine users receiving a
+    `reply` from the server? They never requested a message. With events, a 1:1
+    relationship doesn't work.
+
+    - It's best to look the relationship between a server and server similarly
+    to two people, with one taking direction from another. Jack needs to do some
+    work, so he offloads it to Ryan. He tells Ryan to go park his car. Ryan then
+    asks a question, `where do you want it parked`? The work order, treated as a
+    sequence of instructions, gets updated with `on the side of the road` The
+    `Car was parked on the side of the road` event is then triggered, and it's
+    completion broadcast.
+
+    - The work order and the question are not treated as events, and neither is
+    a question `answered`. An event is simply the result of a work order, which
+    may or may not have been augmented by questions."
+servers:
+  production:
+    host: spirit.igoratakhanov.com
+    pathname: /ws
+    protocol: wss
+    description: Websocket connection that handles every aspect of the app
 channels:
-  hello:
-    address: 'hello'
+  root:
+    address: /ws
     messages:
-      sayHelloMessage:
-        payload:
-          type: string
-          pattern: '^hello .+$'
+      hello:
+        $ref: '#/components/messages/hello'
+      reaction:
+        $ref: '#/components/messages/reaction'
+      acknowledge:
+        $ref: '#/components/messages/acknowledge'
+    bindings:
+      ws:
+        query:
+          type: object
+          description: >-
+            Room IDs determine which room the user enters on landing, and the
+            purpose is for users to be able to invite others by copy pasting the
+            URL.
+          properties:
+            roomID:
+              type: string
+              description:
+                Room ID determines which room the user enters. If there is no
+                value, a room is created automatically and the ID added to the
+                url param.
 operations:
-  receiveHello:
-    action: 'receive'
+  helloListener:
+    action: receive
     channel:
-      $ref: '#/channels/hello'
+      $ref: '#/channels/root'
+    messages:
+      - $ref: '#/channels/root/messages/hello'
+  reactionListener:
+    action: receive
+    channel:
+      $ref: '#/channels/root'
+    messages:
+      - $ref: '#/channels/root/messages/reaction'
+    reply:
+      messages:
+        - $ref: '#/channels/root/messages/acknowledge'
+      channel:
+        $ref: '#/channels/root'
+components:
+  messages:
+    reaction:
+      summary:
+        Action triggered when the channel receives a new reaction-added event
+      payload:
+        $ref: '#/components/schemas/reaction'
+    hello:
+      summary:
+        Action triggered when a successful WebSocket connection is established
+      payload:
+        $ref: '#/components/schemas/hello'
+    acknowledge:
+      summary: Acknowledgement response sent to Server
+      payload:
+        $ref: '#/components/schemas/acknowledge'
+  schemas:
+    hello:
+      type: object
+      properties:
+        type:
+          type: string
+          description: A hello string confirming WebSocket connection
+        connection_info:
+          type: object
+          properties:
+            app_id:
+              type: string
+        num_connections:
+          type: integer
+        debug_info:
+          type: object
+          properties:
+            host:
+              type: string
+            started:
+              type: string
+            build_number:
+              type: integer
+            approximate_connection_time:
+              type: integer
+    reaction:
+      type: object
+      properties:
+        envelope_id:
+          type: string
+          description: 'Unique ID assigned to payload'
+        payload:
+          type: object
+          description: 'Payload of the reaction added event'
+          properties:
+            token:
+              type: string
+            team_id:
+              type: string
+            event:
+              type: object
+              properties:
+                user:
+                  type: string
+                  description: User ID who performed this event
+                reaction:
+                  type: string
+                  description: The only reaction that you need is a heart emoji
+                item_user:
+                  type: string
+                  description: |
+                    User ID that created the original item that has been reacted
+                    to
+                item:
+                  type: object
+                  properties:
+                    channel:
+                      type: string
+                      description: Channel information of original message
+                    ts:
+                      type: string
+                      description: Timestamp information of original message
+                event_ts:
+                  type: string
+                  description: Reaction timestamp
+        type:
+          type: string
+        accepts_response_payload:
+          type: boolean
+    acknowledge:
+      type: object
+      properties:
+        envelope_id:
+          type: string
+          description: 'Unique ID of acknowledged payload'
+        payload:
+          type: object
+          description: 'Optional payload of event'
