@@ -65,4 +65,5 @@ type JoinRoomWebsocketMessage struct {
 type JoinRoomData struct {
 	RoomID  uint     `json:"room_id,omitempty"`
 	ChatLog []string `json:"chat_log,omitempty"`
+	Name    string   `json:"name,omitempty"`
 }

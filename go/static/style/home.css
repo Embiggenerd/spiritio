@@ -1,0 +1,46 @@
+@import url('normalize.css');
+
+.chat {
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.chat-input {
+    height: 50px;
+    width: 100%;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px lightgray dotted;
+}
+
+.chat-log {
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    display: flex;
+    flex-direction: column-reverse;
+}
+
+.chat-message {
+    width: 100%;
+    min-height: 20px;
+}
+
+.chat-message > p {
+    margin: 0;
+}
+
+.video-area-overlay {
+    position: absolute;
+    top: 0;
+    height: 100vh;
+    width: 100vw;
+    background: transparent;
+    box-sizing: border-box;
+    padding: 20px;
+    z-index: 1000;
+}

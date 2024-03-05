@@ -2,6 +2,7 @@ package sfu
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -126,11 +127,13 @@ func (s *SFUService) SignalPeerConnections() {
 			}
 
 			if err = s.PeerConnections[i].PeerConnection.SetLocalDescription(offer); err != nil {
+				fmt.Println("PeerConnection.SetLocalDescri", err)
 				return true
 			}
 
 			offerString, err := json.Marshal(offer)
 			if err != nil {
+				fmt.Println("offerstring", err)
 				return true
 			}
 

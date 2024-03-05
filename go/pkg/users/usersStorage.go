@@ -2,7 +2,6 @@ package users
 
 import (
 	"github.com/Embiggenerd/spiritio/pkg/db"
-	"github.com/Embiggenerd/spiritio/pkg/utils"
 )
 
 type UsersStore interface {
@@ -29,9 +28,9 @@ func (u *UsersStorage) CreateUser(admin bool) (*User, error) {
 		i = 1
 	}
 
-	newUser := &User{}
-	newUser.Name = utils.RandName()
-	newUser.Admin = i
+	newUser := &User{
+		Admin: i,
+	}
 
 	userResult := u.db.DB.Create(newUser)
 	return newUser, userResult.Error

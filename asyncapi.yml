@@ -59,12 +59,12 @@ channels:
                 value, a room is created automatically and the ID added to the
                 url param.
 operations:
-  helloListener:
+  init_media:
     action: receive
     channel:
       $ref: '#/channels/root'
     messages:
-      - $ref: '#/channels/root/messages/hello'
+      - $ref: '#/channels/root/messages/init_media'
   reactionListener:
     action: receive
     channel:
@@ -78,6 +78,11 @@ operations:
         $ref: '#/channels/root'
 components:
   messages:
+    init_media:
+      summary:
+        The client sends a work order to start connecting to audio and video.
+      payload:
+        $ref: '#/components/schemas/init_media'
     reaction:
       summary:
         Action triggered when the channel receives a new reaction-added event
@@ -93,6 +98,10 @@ components:
       payload:
         $ref: '#/components/schemas/acknowledge'
   schemas:
+    init_media:
+      type: object
+      properties:
+
     hello:
       type: object
       properties:

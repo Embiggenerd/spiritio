@@ -46,8 +46,10 @@ func NewServer(ctx context.Context, cfg *config.Config, log logger.Logger, rooms
 
 func (s *APIServer) Run() {
 	mux := http.NewServeMux()
+	fs := http.FileServer(http.Dir("./static"))
+	mux.Handle("/", fs)
 
-	mux.HandleFunc("/", s.serveHome)
+	// mux.HandleFunc("/", s.serveHome)
 	mux.HandleFunc("/ws", s.serveWS)
 
 	withMW := s.log.LoggingMW(mux)
@@ -77,6 +79,7 @@ func (s *APIServer) serveHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	http.ServeFile(w, r, "static/index.html")
 }
 
@@ -86,19 +89,19 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 	reqID, _ := metadata.Get("requestID")
 
 	wsClient, err := websocketClient.New(ctx, s.log, w, r, nil)
-
 	if err != nil {
 		s.log.LogRequestError(reqID.(string), err.Error(), http.StatusInternalServerError)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	defer wsClient.Conn.Close()
-	// Block until user is either created or authenticated
-	userAuth := make(chan *users.User, 1)
-	user := <-userAuth
-	s.log.Info("user name: " + user.Name)
+
 	var room *rooms.ChatRoom
 	roomIDStr := r.URL.Query().Get("room")
+
+	visitor := &rooms.Visitor{
+		Client: wsClient,
+	}
 	if roomIDStr == "" {
 		// If the user does not have roomID in search params, create new room
 		room, err = s.roomsService.CreateRoom(ctx)
@@ -114,7 +117,9 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 		message.Data = strconv.FormatUint(uint64(room.ID), 10)
 		wsClient.Writer.WriteJSON(message)
 	} else {
-		// If there is a room specified, or if the creator's URL was modified, they will be redirected here
+		// If there is a room specified, or if the creator's URL was modified,
+		// they will be redirected here
+
 		roomID, err := utils.StringToUint(roomIDStr)
 		if err != nil {
 			s.log.Error(err.Error())
@@ -125,6 +130,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			// If found, send appropriate message
 			room = r
+			room.AddVisitor(visitor)
 			message := &types.WebsocketMessage{}
 			message.Event = "joined-room"
 			var chats []string
@@ -138,6 +144,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 
 			wsClient.Writer.WriteJSON(message)
 		} else {
+			// Bellow code was never tested, and looks faulty
 			room, err = s.roomsService.GetRoomByID(roomID)
 			if errors.Is(err, gorm.ErrRecordNotFound) || room.ID == 0 {
 				s.log.Error("room with key %s doesn't exist", roomIDStr)
@@ -148,6 +155,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 				for i := 0; i < len(*room.ChatLog); i++ {
 					chats = append(chats, (*room.ChatLog)[i].Text)
 				}
+
 				message := &types.WebsocketMessage{}
 				message.Event = "joined-room"
 				message.Data = websocketClient.JoinRoomData{
@@ -159,72 +167,74 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// Create peer connection
-	peerConnection, err := room.SFU.CreatePeerConnection()
-	if err != nil {
-		s.log.Error(err.Error())
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer peerConnection.Close()
+	// // Create peer connection
+	// peerConnection, err := room.SFU.CreatePeerConnection()
+	// if err != nil {
+	// 	s.log.Error(err.Error())
+	// 	http.Error(w, "Internal server error", http.StatusInternalServerError)
+	// 	return
+	// }
+	// defer peerConnection.Close()
 
-	room.AddPeerConnection(peerConnection, wsClient.Writer)
+	// room.AddPeerConnection(peerConnection, wsClient.Writer)
 
-	peerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
-		if i == nil {
-			return
-		}
+	// peerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
+	// 	if i == nil {
+	// 		return
+	// 	}
 
-		candidateString, err := json.Marshal(i.ToJSON())
-		if err != nil {
-			s.log.Error(err.Error())
-			return
-		}
+	// 	candidateString, err := json.Marshal(i.ToJSON())
+	// 	if err != nil {
+	// 		s.log.Error(err.Error())
+	// 		return
+	// 	}
 
-		if writeErr := wsClient.Writer.WriteJSON(&types.WebsocketMessage{
-			Event: "candidate",
-			Data:  string(candidateString),
-		}); writeErr != nil {
-			s.log.Error(writeErr.Error())
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
-	})
+	// 	if writeErr := wsClient.Writer.WriteJSON(&types.WebsocketMessage{
+	// 		Event: "candidate",
+	// 		Data:  string(candidateString),
+	// 	}); writeErr != nil {
+	// 		s.log.Error(writeErr.Error())
+	// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	// 	}
+	// })
 
-	peerConnection.OnConnectionStateChange(func(p webrtc.PeerConnectionState) {
-		switch p {
-		case webrtc.PeerConnectionStateFailed:
-			if err := peerConnection.Close(); err != nil {
-				s.log.Error(err.Error())
-			}
-		case webrtc.PeerConnectionStateClosed:
-			room.SFU.SignalPeerConnections()
-		default:
-		}
-	})
+	// peerConnection.OnConnectionStateChange(func(p webrtc.PeerConnectionState) {
+	// 	switch p {
+	// 	case webrtc.PeerConnectionStateFailed:
+	// 		if err := peerConnection.Close(); err != nil {
+	// 			s.log.Error(err.Error())
+	// 		}
+	// 	case webrtc.PeerConnectionStateClosed:
+	// 		room.SFU.SignalPeerConnections()
+	// 	default:
+	// 	}
+	// })
 
-	peerConnection.OnTrack(func(t *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
-		// Create a track to fan out our incoming video to all peers
-		trackLocal := room.SFU.AddTrack(t)
-		defer room.SFU.RemoveTrack(trackLocal)
+	// peerConnection.OnTrack(func(t *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
+	// 	// Create a track to fan out our incoming video to all peers
+	// 	trackLocal := room.SFU.AddTrack(t)
+	// 	defer room.SFU.RemoveTrack(trackLocal)
 
-		buf := make([]byte, 1500)
-		for {
-			i, _, err := t.Read(buf)
-			if err != nil {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
+	// 	buf := make([]byte, 1500)
+	// 	for {
+	// 		i, _, err := t.Read(buf)
+	// 		if err != nil {
+	// 			http.Error(w, "Internal server error", http.StatusInternalServerError)
+	// 			return
+	// 		}
 
-			if _, err = trackLocal.Write(buf[:i]); err != nil {
-				s.log.Error(err.Error())
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-		}
-	})
+	// 		if _, err = trackLocal.Write(buf[:i]); err != nil {
+	// 			s.log.Error(err.Error())
+	// 			http.Error(w, "Internal server error", http.StatusInternalServerError)
+	// 			return
+	// 		}
+	// 	}
+	// })
 
-	room.SFU.SignalPeerConnections()
+	// room.SFU.SignalPeerConnections()
 
+	var peerConnection *webrtc.PeerConnection
+	i := 1
 	message := &types.WebsocketMessage{}
 	for {
 		_, raw, err := wsClient.Conn.ReadMessage()
@@ -238,9 +248,77 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 		}
 		s.log.LogEventReceived(reqID.(string), metadata.ToJSON(), message)
 		switch message.Event {
+		case "media_request":
+			fmt.Println("media_requestx", i)
+			i = i + 1
+			// Create peer connection
+			peerConnection, err = room.SFU.CreatePeerConnection()
+			if err != nil {
+				s.log.Error(err.Error())
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			defer peerConnection.Close()
+
+			room.AddPeerConnection(peerConnection, wsClient.Writer)
+
+			peerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
+				if i == nil {
+					return
+				}
+
+				candidateString, err := json.Marshal(i.ToJSON())
+				if err != nil {
+					s.log.Error(err.Error())
+					return
+				}
+
+				if writeErr := wsClient.Writer.WriteJSON(&types.WebsocketMessage{
+					Event: "candidate",
+					Data:  string(candidateString),
+				}); writeErr != nil {
+					s.log.Error(writeErr.Error())
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+				}
+			})
+
+			peerConnection.OnConnectionStateChange(func(p webrtc.PeerConnectionState) {
+				switch p {
+				case webrtc.PeerConnectionStateFailed:
+					if err := peerConnection.Close(); err != nil {
+						s.log.Error(err.Error())
+					}
+				case webrtc.PeerConnectionStateClosed:
+					room.SFU.SignalPeerConnections()
+				default:
+				}
+			})
+
+			peerConnection.OnTrack(func(t *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
+				// Create a track to fan out our incoming video to all peers
+				trackLocal := room.SFU.AddTrack(t)
+				defer room.SFU.RemoveTrack(trackLocal)
+
+				buf := make([]byte, 1500)
+				for {
+					i, _, err := t.Read(buf)
+					if err != nil {
+						http.Error(w, "Internal server error", http.StatusInternalServerError)
+						return
+					}
+
+					if _, err = trackLocal.Write(buf[:i]); err != nil {
+						s.log.Error(err.Error())
+						http.Error(w, "Internal server error", http.StatusInternalServerError)
+						return
+					}
+				}
+			})
+
+			room.SFU.SignalPeerConnections()
+
 		case "authentication":
 			if message.Data == nil || message.Data == "" {
-				fmt.Println("*&*&", message.Data)
 				message := &types.WebsocketMessage{
 					Event: "error",
 					Data:  http.StatusUnauthorized,
@@ -285,7 +363,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				userAuth <- user
+				// userAuth <- user
 
 			} else {
 				token, err := s.userService.ValidateAccessToken(message.Data.(string))
@@ -336,7 +414,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				userAuth <- user
+				// userAuth <- user
 			}
 			// data := &struct {
 			// 	Bearer *jwt.Token
@@ -377,7 +455,8 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			}
 		case "user-message":
 			// Send message to each client subbed to this peer's peerConnections
-			room.SFU.BroadcastMessage(message)
+			// room.SFU.BroadcastMessage(message)
+			room.BroadcastMessage(message)
 			// Write new chatlog to DB with this room's ID as foreign key
 			err := s.roomsService.SaveChatLog(message.Data.(string), room)
 			if err != nil {
@@ -386,3 +465,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+// type Question struct {
+// 	ask string `json:"ask,omitempty"`
+// }
