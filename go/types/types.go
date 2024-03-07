@@ -1,8 +1,8 @@
 package types
 
 type WebsocketMessage struct {
-	Event string      `json:"event"`
-	Data  interface{} `json:"data"`
+	Type string      `json:"type,omitempty"`
+	Data interface{} `json:"data,omitempty"`
 }
 type Event struct {
 	Event string      `json:"event"`
@@ -10,8 +10,7 @@ type Event struct {
 }
 
 type Question struct {
-	Type string `json:"type,omitempty"`
-	Ask  string `json:"ask,omitempty"`
+	Ask string `json:"ask,omitempty"`
 }
 
 type WorkOrder struct {

@@ -49,7 +49,6 @@ func (s *APIServer) Run() {
 	fs := http.FileServer(http.Dir("./static"))
 	mux.Handle("/", fs)
 
-	// mux.HandleFunc("/", s.serveHome)
 	mux.HandleFunc("/ws", s.serveWS)
 
 	withMW := s.log.LoggingMW(mux)
@@ -64,23 +63,6 @@ func (s *APIServer) Run() {
 	if err := http.Serve(l, withMW); err != nil {
 		s.log.Fatal(err.Error())
 	}
-}
-
-func (s *APIServer) serveHome(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	reqID, _ := utils.ExposeContextMetadata(ctx).Get("requestID")
-	if r.URL.Path != "/" {
-		s.log.LogRequestError(reqID.(string), "Not found", http.StatusNotFound)
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-	if r.Method != http.MethodGet {
-		s.log.LogRequestError(reqID.(string), "Method not allowed", http.StatusMethodNotAllowed)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	http.ServeFile(w, r, "static/index.html")
 }
 
 func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
@@ -102,6 +84,12 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 	visitor := &rooms.Visitor{
 		Client: wsClient,
 	}
+
+	err = visitor.Clarify("authentication")
+	if err != nil {
+		s.log.Error(err.Error())
+	}
+
 	if roomIDStr == "" {
 		// If the user does not have roomID in search params, create new room
 		room, err = s.roomsService.CreateRoom(ctx)
@@ -112,14 +100,13 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 		}
 		metadata.Set("roomID", room.ID)
 		// Create and send message with appropriate event
-		message := &types.WebsocketMessage{}
-		message.Event = "created-room"
-		message.Data = strconv.FormatUint(uint64(room.ID), 10)
-		wsClient.Writer.WriteJSON(message)
+		event := &types.Event{}
+		event.Event = "created_room"
+		event.Data = strconv.FormatUint(uint64(room.ID), 10)
+		wsClient.Writer.WriteJSON(event)
 	} else {
 		// If there is a room specified, or if the creator's URL was modified,
 		// they will be redirected here
-
 		roomID, err := utils.StringToUint(roomIDStr)
 		if err != nil {
 			s.log.Error(err.Error())
@@ -131,18 +118,18 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			// If found, send appropriate message
 			room = r
 			room.AddVisitor(visitor)
-			message := &types.WebsocketMessage{}
-			message.Event = "joined-room"
+			event := &types.Event{}
+			event.Event = "joined_room"
 			var chats []string
 			for i := 0; i < len(*room.ChatLog); i++ {
 				chats = append(chats, (*room.ChatLog)[i].Text)
 			}
-			message.Data = websocketClient.JoinRoomData{
+			event.Data = websocketClient.JoinRoomData{
 				ChatLog: chats,
 				RoomID:  room.ID,
 			}
 
-			wsClient.Writer.WriteJSON(message)
+			wsClient.Writer.WriteJSON(event)
 		} else {
 			// Bellow code was never tested, and looks faulty
 			room, err = s.roomsService.GetRoomByID(roomID)
@@ -156,17 +143,18 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 					chats = append(chats, (*room.ChatLog)[i].Text)
 				}
 
-				message := &types.WebsocketMessage{}
-				message.Event = "joined-room"
-				message.Data = websocketClient.JoinRoomData{
+				event := &types.Event{}
+				event.Event = "joined_room"
+				event.Data = websocketClient.JoinRoomData{
 					ChatLog: chats,
 					RoomID:  room.ID,
 				}
 
-				wsClient.Writer.WriteJSON(message)
+				wsClient.Writer.WriteJSON(event)
 			}
 		}
 	}
+
 	// // Create peer connection
 	// peerConnection, err := room.SFU.CreatePeerConnection()
 	// if err != nil {
@@ -235,19 +223,37 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 
 	var peerConnection *webrtc.PeerConnection
 	i := 1
-	message := &types.WebsocketMessage{}
+	workOrder := &types.WorkOrder{}
 	for {
 		_, raw, err := wsClient.Conn.ReadMessage()
 		if err != nil {
 			s.log.Error(err.Error())
 			return
-		} else if err := json.Unmarshal(raw, &message); err != nil {
+		} else if err := json.Unmarshal(raw, &workOrder); err != nil {
 			s.log.Error(err.Error())
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		s.log.LogEventReceived(reqID.(string), metadata.ToJSON(), message)
-		switch message.Event {
+		// fmt.Println("this should be a  work order!!!", message.Type == "work_order")
+
+		// // if message.Type == "work_order" {
+		// fmt.Println("this is a work order!!!")
+		// b, err := json.Marshal(message.Data)
+		// if err != nil {
+		// 	s.log.Error(err.Error())
+		// }
+
+		// workOrder := &types.WorkOrder{}
+
+		// if err = json.Unmarshal(b, &workOrder); err != nil {
+		// 	s.log.Error(err.Error())
+		// 	http.Error(w, "Internal server error", http.StatusInternalServerError)
+		// 	return
+		// }
+
+		s.log.LogWorkOrderReceived(reqID.(string), metadata.ToJSON(), workOrder)
+
+		switch workOrder.Order {
 		case "media_request":
 			fmt.Println("media_requestx", i)
 			i = i + 1
@@ -273,7 +279,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				if writeErr := wsClient.Writer.WriteJSON(&types.WebsocketMessage{
+				if writeErr := wsClient.Writer.WriteJSON(&types.Event{
 					Event: "candidate",
 					Data:  string(candidateString),
 				}); writeErr != nil {
@@ -318,104 +324,104 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			room.SFU.SignalPeerConnections()
 
 		case "authentication":
-			if message.Data == nil || message.Data == "" {
-				message := &types.WebsocketMessage{
-					Event: "error",
-					Data:  http.StatusUnauthorized,
-				}
-				if err = wsClient.Writer.WriteJSON(message); err != nil {
-					s.log.Error(err.Error())
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
+			// if message.Data == nil || message.Data == "" {
+			// 	event := &types.Event{
+			// 		Event: "error",
+			// 		Data:  http.StatusUnauthorized,
+			// 	}
+			// 	if err = wsClient.Writer.WriteJSON(event); err != nil {
+			// 		s.log.Error(err.Error())
+			// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// 		return
+			// 	}
 
-				// create new user or ask for userName / password
-				user, token, err := s.userService.CreateUser(false)
-				if err != nil {
-					s.log.Error(err.Error())
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
-				// Once we have created a user, we can write to the channel blocking the function
+			// 	// create new user or ask for userName / password
+			// 	user, token, err := s.userService.CreateUser(false)
+			// 	if err != nil {
+			// 		s.log.Error(err.Error())
+			// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// 		return
+			// 	}
+			// 	// Once we have created a user, we can write to the channel blocking the function
 
-				message = &types.WebsocketMessage{
-					Event: "authorization",
-					Data:  token,
-				}
+			// 	event = &types.Event{
+			// 		Event: "authorization",
+			// 		Data:  token,
+			// 	}
 
-				if err = wsClient.Writer.WriteJSON(message); err != nil {
-					s.log.Error(err.Error())
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
+			// 	if err = wsClient.Writer.WriteJSON(event); err != nil {
+			// 		s.log.Error(err.Error())
+			// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// 		return
+			// 	}
 
-				message = &types.WebsocketMessage{
-					Event: "login",
-					Data: map[string]string{
-						"userName": user.Name,
-						"userID":   utils.UintToString(user.ID),
-					},
-				}
+			// 	event = &types.Event{
+			// 		Event: "login",
+			// 		Data: map[string]string{
+			// 			"userName": user.Name,
+			// 			"userID":   utils.UintToString(user.ID),
+			// 		},
+			// 	}
 
-				if err = wsClient.Writer.WriteJSON(message); err != nil {
-					s.log.Error(err.Error())
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
+			// 	if err = wsClient.Writer.WriteJSON(event); err != nil {
+			// 		s.log.Error(err.Error())
+			// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// 		return
+			// 	}
 
-				// userAuth <- user
+			// 	// userAuth <- user
 
-			} else {
-				token, err := s.userService.ValidateAccessToken(message.Data.(string))
-				if err != nil {
-					s.log.Info("*&^", err)
-					message := &types.WebsocketMessage{
-						Event: "error",
-						Data:  401,
-					}
-					if err = wsClient.Writer.WriteJSON(message); err != nil {
-						s.log.Error(err.Error())
-						http.Error(w, "Internal server error", http.StatusInternalServerError)
-						return
-					}
-				}
+			// } else {
+			// 	token, err := s.userService.ValidateAccessToken(workOrder.Details.(string))
+			// 	if err != nil {
+			// 		s.log.Info("*&^", err)
+			// 		event := &types.Event{
+			// 			Event: "error",
+			// 			Data:  401,
+			// 		}
+			// 		if err = wsClient.Writer.WriteJSON(event); err != nil {
+			// 			s.log.Error(err.Error())
+			// 			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// 			return
+			// 		}
+			// 	}
 
-				user, err := s.userService.GetUserFromAccessToken(token)
-				if err != nil {
-					s.log.Error(err.Error())
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
-				newToken, err := s.userService.CreateAccessToken(user)
-				if err != nil {
-					s.log.Error(err.Error())
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
+			// 	user, err := s.userService.GetUserFromAccessToken(token)
+			// 	if err != nil {
+			// 		s.log.Error(err.Error())
+			// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// 		return
+			// 	}
+			// 	newToken, err := s.userService.CreateAccessToken(user)
+			// 	if err != nil {
+			// 		s.log.Error(err.Error())
+			// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// 		return
+			// 	}
 
-				message := &types.WebsocketMessage{
-					Event: "authorization",
-					Data:  newToken,
-				}
+			// 	event := &types.Event{
+			// 		Event: "authorization",
+			// 		Data:  newToken,
+			// 	}
 
-				if err = wsClient.Writer.WriteJSON(message); err != nil {
-					s.log.Error(err.Error())
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
+			// 	if err = wsClient.Writer.WriteJSON(event); err != nil {
+			// 		s.log.Error(err.Error())
+			// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// 		return
+			// 	}
 
-				message = &types.WebsocketMessage{
-					Event: "login",
-					Data:  user,
-				}
-				if err = wsClient.Writer.WriteJSON(message); err != nil {
-					s.log.Error(err.Error())
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
+			// 	event = &types.Event{
+			// 		Event: "login",
+			// 		Data:  user,
+			// 	}
+			// 	if err = wsClient.Writer.WriteJSON(event); err != nil {
+			// 		s.log.Error(err.Error())
+			// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// 		return
+			// 	}
 
-				// userAuth <- user
-			}
+			// 	// userAuth <- user
+			// }
 			// data := &struct {
 			// 	Bearer *jwt.Token
 			// }{}
@@ -429,7 +435,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 
 		case "candidate":
 			candidate := webrtc.ICECandidateInit{}
-			if err := json.Unmarshal([]byte(message.Data.(string)), &candidate); err != nil {
+			if err := json.Unmarshal([]byte(workOrder.Details.(string)), &candidate); err != nil {
 				s.log.Error(err.Error())
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
@@ -442,7 +448,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			}
 		case "answer":
 			answer := webrtc.SessionDescription{}
-			if err := json.Unmarshal([]byte(message.Data.(string)), &answer); err != nil {
+			if err := json.Unmarshal([]byte(workOrder.Details.(string)), &answer); err != nil {
 				s.log.Error(err.Error())
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
@@ -453,16 +459,23 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
-		case "user-message":
+		case "user_message":
 			// Send message to each client subbed to this peer's peerConnections
 			// room.SFU.BroadcastMessage(message)
-			room.BroadcastMessage(message)
+			event := &types.Event{
+				Event: "user_message",
+				Data:  workOrder.Details,
+			}
+			room.BroadcastEvent(event)
 			// Write new chatlog to DB with this room's ID as foreign key
-			err := s.roomsService.SaveChatLog(message.Data.(string), room)
+			err := s.roomsService.SaveChatLog(workOrder.Details.(string), room)
 			if err != nil {
 				s.log.Error(err.Error())
 			}
+		case "close_connection":
+			peerConnection.Close()
 		}
+		// }
 	}
 }
 

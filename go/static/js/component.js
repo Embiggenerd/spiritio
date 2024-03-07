@@ -27,7 +27,7 @@ const component = {
             this.handleOnTrack.bind(this),
             this.handleIceCandidate.bind(this)
         )
-        // Order media connecitons from backend
+        // Order media capabilities from backend
         this.orderMedia()
     },
 
@@ -38,13 +38,9 @@ const component = {
                 e.preventDefault()
                 const formData = new FormData(e.target)
                 const { message } = Object.fromEntries(formData)
-                const msg = {
-                    event: 'user-message',
-                    data: message,
-                }
-                this.message.sendMessage(msg)
+
+                this.orderWork('user_message', message)
                 e.target.reset()
-                // this.renderer.chatLog.addMessage(message)
             }
         }
     },
@@ -72,65 +68,18 @@ const component = {
         if (!e.candidate) {
             return
         }
-        const message = {
-            event: 'candidate',
-            data: JSON.stringify(e.candidate),
-        }
-        this.message.sendMessage(message)
+        this.orderWork('candidate', JSON.stringify(e.candidate))
     },
     handleMessage: async function (event) {
         const message = JSON.parse(event.data)
-        console.log({ received_message: message })
         if (!message) {
             return console.log('failed to parse message ', event.data)
         }
-        if (message.event == 'candidate') {
-            let candidate = JSON.parse(message.data)
-            if (!candidate) {
-                return console.log('failed to parse candidate')
-            }
-            this.media.addCandidate(candidate)
-            return
+        if (message.type == 'event') {
+            await this.handleEvent(message.data)
         }
-
-        if (message.event == 'offer') {
-            let offer = JSON.parse(message.data)
-            if (!offer) {
-                return console.log('failed to parse answer')
-            }
-            this.media.setRemoteDescription(offer)
-            // const answer = this.media.createAnswer()
-            const answer = await this.media.createAnswer()
-            this.media.setLocalDescription(answer)
-            const msg = {
-                event: 'answer',
-                data: JSON.stringify(answer),
-            }
-            this.message.sendMessage(msg)
-        }
-
-        if (message.event == 'joined-room') {
-            const chatLog = message.data.chat_log
-            if (chatLog && chatLog.length) {
-                let i = 0
-                while (i < chatLog.length) {
-                    this.renderer.chatLog.addMessage(chatLog[i])
-                    i = i + 1
-                }
-            }
-            return
-        }
-
-        if (message.event == 'created-room') {
-            const urlParams = new URLSearchParams(window.location.search)
-            urlParams.set('room', message.data)
-            window.location.search = urlParams
-            return
-        }
-
-        if (message.event == 'user-message') {
-            this.renderer.chatLog.addMessage(message.data)
-            return
+        if (message.type == 'question') {
+            this.handleQuestoin(message.data)
         }
     },
 
@@ -145,16 +94,73 @@ const component = {
     },
 
     handleClose: function () {
-        this.renderer.chatLog.addMessage('ADMIN (to you): connection closed')
+        this.orderWork('close_connection', '')
+        this.renderer.chatLog.addMessage(
+            'ADMIN (to you): unable to receive messages'
+        )
     },
 
     orderMedia: function () {
-        console.log('orderMessag')
+        this.orderWork('media_request', this.media.constraints)
+    },
+
+    orderWork: function (order, details) {
         const message = {
-            event: 'media_request',
-            data: this.media.constraints,
+            order,
+            details,
         }
         this.message.sendMessage(message)
+    },
+
+    handleEvent: async function (event) {
+        if (event.event == 'candidate') {
+            let candidate = JSON.parse(event.data)
+            if (!candidate) {
+                return console.log('failed to parse candidate')
+            }
+            this.media.addCandidate(candidate)
+            return
+        }
+
+        if (event.event == 'offer') {
+            let offer = JSON.parse(event.data)
+            if (!offer) {
+                return console.log('failed to parse answer')
+            }
+            this.media.setRemoteDescription(offer)
+            // const answer = this.media.createAnswer()
+            const answer = await this.media.createAnswer()
+            this.media.setLocalDescription(answer)
+
+            this.orderWork('answer', JSON.stringify(answer))
+        }
+
+        if (event.event == 'joined_room') {
+            const chatLog = event.data.chat_log
+            if (chatLog && chatLog.length) {
+                let i = 0
+                while (i < chatLog.length) {
+                    this.renderer.chatLog.addMessage(chatLog[i])
+                    i = i + 1
+                }
+            }
+            return
+        }
+
+        if (event.event == 'created_room') {
+            const urlParams = new URLSearchParams(window.location.search)
+            urlParams.set('room', event.data)
+            window.location.search = urlParams
+            return
+        }
+
+        if (event.event == 'user_message') {
+            this.renderer.chatLog.addMessage(event.data)
+            return
+        }
+    },
+    handleQuestoin: function (question) {
+        console.log({ question })
     },
 }
 

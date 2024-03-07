@@ -2,7 +2,9 @@ package websocketClient
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"reflect"
 	"sync"
 
 	"github.com/Embiggenerd/spiritio/pkg/logger"
@@ -45,9 +47,21 @@ func (t *ThreadSafeWriter) WriteJSON(v interface{}) error {
 	md := utils.ExposeContextMetadata(t.ctx)
 	mdJSON := md.ToJSON()
 	reqID, _ := md.Get("requestID")
-	t.log.LogEventSent(reqID.(string), mdJSON, v.(*types.WebsocketMessage))
+	message := &types.WebsocketMessage{
+		Data: v,
+	}
+	switch v.(type) {
+	case *types.Event:
+		message.Type = "event"
+	case *types.Question:
+		message.Type = "question"
+	default:
+		// fmt.Println("type&&", ty)
+	}
+	fmt.Println("type&", reflect.TypeOf(v))
+	t.log.LogMessageSent(reqID.(string), mdJSON, message)
 
-	return t.Conn.WriteJSON(v)
+	return t.Conn.WriteJSON(message)
 }
 
 type ThreadSafeWriter struct {

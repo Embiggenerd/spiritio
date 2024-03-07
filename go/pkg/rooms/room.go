@@ -14,7 +14,7 @@ import (
 type Room interface {
 	Build()
 	AddPeerConnection(pc *webrtc.PeerConnection, w *websocketClient.ThreadSafeWriter)
-	BroadcastMessage(message *types.WebsocketMessage)
+	BroadcastEvent(event *types.Event)
 	AddVisitor(visitor *Visitor)
 }
 
@@ -42,9 +42,9 @@ func (r *ChatRoom) Build() {
 	}()
 }
 
-func (r *ChatRoom) BroadcastMessage(message *types.WebsocketMessage) {
+func (r *ChatRoom) BroadcastEvent(event *types.Event) {
 	for _, v := range r.Visitors {
-		v.Client.Writer.WriteJSON(message)
+		v.Client.Writer.WriteJSON(event)
 	}
 }
 
@@ -78,4 +78,11 @@ func (r *ChatRoom) untilUnique(name string) string {
 		return r.untilUnique(utils.RandName())
 	}
 	return name
+}
+
+func (v *Visitor) Clarify(ask string) error {
+	question := &types.Question{
+		Ask: ask,
+	}
+	return v.Client.Writer.WriteJSON(question)
 }

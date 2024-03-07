@@ -79,12 +79,12 @@ func (h *Handler) computeAttrs(
 }
 
 func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
-
 	var level string
 	levelAttr := slog.Attr{
 		Key:   slog.LevelKey,
 		Value: slog.AnyValue(r.Level),
 	}
+
 	if h.r != nil {
 		levelAttr = h.r([]string{}, levelAttr)
 	}
@@ -135,6 +135,7 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	if err != nil {
 		return err
 	}
+
 	bytes, err := json.MarshalIndent(attrs, "", "  ")
 	if err != nil {
 		return fmt.Errorf("error when marshaling attrs: %w", err)

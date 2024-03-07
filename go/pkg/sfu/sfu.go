@@ -127,17 +127,15 @@ func (s *SFUService) SignalPeerConnections() {
 			}
 
 			if err = s.PeerConnections[i].PeerConnection.SetLocalDescription(offer); err != nil {
-				fmt.Println("PeerConnection.SetLocalDescri", err)
 				return true
 			}
 
 			offerString, err := json.Marshal(offer)
 			if err != nil {
-				fmt.Println("offerstring", err)
 				return true
 			}
 
-			if err = s.PeerConnections[i].Websocket.WriteJSON(&types.WebsocketMessage{
+			if err = s.PeerConnections[i].Websocket.WriteJSON(&types.Event{
 				Event: "offer",
 				Data:  string(offerString),
 			}); err != nil {
@@ -198,6 +196,7 @@ type PeerConnectionState struct {
 }
 
 func (s *SFUService) CreatePeerConnection() (*webrtc.PeerConnection, error) {
+	fmt.Print("CreatePeerConnection()")
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
 		log.Print(err)

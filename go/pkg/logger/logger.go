@@ -32,9 +32,9 @@ type Logger interface {
 	LoggingMW(next http.Handler) http.Handler
 	LogAPIRequest(id, ip, path, port, method string, timeRecieved time.Time, nanoSeconds int64, statusCode int)
 	LogRequestError(requestID, errorMessage string, statusCode int)
-	logEvent(requestID, metadata, direction, event, data string)
-	LogEventSent(requestID, metadata string, message *types.WebsocketMessage)
-	LogEventReceived(requestID, metadata string, message *types.WebsocketMessage)
+	// logMessage(requestID, metadata, direction, message, data string)
+	LogMessageSent(requestID, metadata string, message *types.WebsocketMessage)
+	LogWorkOrderReceived(requestID, metadata string, workOrder *types.WorkOrder)
 }
 
 // replaceAttr masks data from requests and metadata from context
@@ -110,6 +110,7 @@ func (l *CustomLogger) LogAPIRequest(id, ip, path, port, method string, timeReci
 	if statusCode >= 400 {
 		level = slog.LevelError
 	}
+
 	l.Log(context.TODO(), level, "API Request",
 		slog.String("requestID", id),
 		slog.Int("statusCode", statusCode),
@@ -118,7 +119,8 @@ func (l *CustomLogger) LogAPIRequest(id, ip, path, port, method string, timeReci
 		slog.String("port", port),
 		slog.String("method", method),
 		slog.Int64("nanoSeconds", nanoSeconds),
-		slog.Time("timeReceived", timeRecieved))
+		slog.Time("timeReceived", timeRecieved),
+	)
 }
 
 func (l *CustomLogger) LogRequestError(requestID, errorMessage string, statusCode int) {
@@ -132,32 +134,32 @@ func (l *CustomLogger) LogRequestError(requestID, errorMessage string, statusCod
 	)
 }
 
-func (l *CustomLogger) LogEventSent(requestID, metadata string, message *types.WebsocketMessage) {
+func (l *CustomLogger) LogMessageSent(requestID, metadata string, message *types.WebsocketMessage) {
 	d, err := json.Marshal(message.Data)
 	if err != nil {
 		l.Error(err.Error())
 		return
 	}
 
-	l.logEvent(requestID, metadata, "Sent", message.Event, string(d))
+	l.logMessage(requestID, metadata, "Sent", message.Type, string(d))
 }
 
-func (l *CustomLogger) LogEventReceived(requestID, metadata string, message *types.WebsocketMessage) {
-	d, err := json.Marshal(message.Data)
+func (l *CustomLogger) LogWorkOrderReceived(requestID, metadata string, workOrder *types.WorkOrder) {
+	d, err := json.Marshal(workOrder.Details)
 	if err != nil {
 		l.Error(err.Error())
 		return
 	}
 
-	l.logEvent(requestID, metadata, "Received", message.Event, string(d))
+	l.logMessage(requestID, metadata, "Received", workOrder.Order, string(d))
 }
-func (l *CustomLogger) logEvent(requestID, metadata, direction, event, data string) {
+func (l *CustomLogger) logMessage(requestID, metadata, direction, messageType, data string) {
 	l.Log(
 		context.TODO(),
 		slog.LevelInfo,
 		"Event Message "+direction,
 		slog.String("requestID", requestID),
-		slog.String("event", event),
+		slog.String("type", messageType),
 		slog.String("data", data),
 		slog.String("metadata", metadata),
 	)
