@@ -12,7 +12,18 @@ const media = {
         )
         // Create peer connection
         this.peerConnection = new RTCPeerConnection()
+        // peerConnection.close(() => {
+        //     peerConnection.getReceivers().forEach((track) => {
+        //         peerConnection.removeTrack(track)
+        //     })
+        // })
+
         return this
+    },
+    closePeerConnection: function () {
+        this.stream.getTracks().forEach((s) => {
+            s.stop()
+        })
     },
     createAnswer: function () {
         return this.peerConnection.createAnswer()

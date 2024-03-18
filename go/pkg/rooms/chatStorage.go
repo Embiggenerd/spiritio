@@ -1,19 +1,28 @@
 package rooms
 
-import "github.com/Embiggenerd/spiritio/pkg/db"
+import (
+	"github.com/Embiggenerd/spiritio/pkg/db"
+	"github.com/Embiggenerd/spiritio/pkg/users"
+)
 
 type ChatLogStore interface {
-	SaveChatlog(text string, room *ChatRoom) (*ChatRoomLog, error)
-	GetChatLogsByRoomID(roomID uint) (*[]ChatRoomLog, error)
+	SaveChatlog(text string, room *ChatRoom, from *users.User) (*ChatRoomLog, error)
+	GetChatLogsByRoomID(roomID uint) ([]ChatRoomLog, error)
 }
 
 type ChatLogStorage struct {
 	db *db.Database
 }
 
-func (s *ChatLogStorage) SaveChatlog(text string, room *ChatRoom) (*ChatRoomLog, error) {
+func (s *ChatLogStorage) SaveChatlog(text string, room *ChatRoom, user *users.User) (*ChatRoomLog, error) {
 	var err error
-	newChatLog := &ChatRoomLog{Text: text, Room: room}
+	newChatLog := &ChatRoomLog{
+		Text:         text,
+		Room:         room,
+		UserName:     user.Name,
+		UserID:       user.ID,
+		UserVerified: user.Verified,
+	}
 
 	result := s.db.DB.Create(newChatLog)
 	err = result.Error
@@ -21,12 +30,12 @@ func (s *ChatLogStorage) SaveChatlog(text string, room *ChatRoom) (*ChatRoomLog,
 	return newChatLog, err
 }
 
-func (s *ChatLogStorage) GetChatLogsByRoomID(roomID uint) (*[]ChatRoomLog, error) {
+func (s *ChatLogStorage) GetChatLogsByRoomID(roomID uint) ([]ChatRoomLog, error) {
 	var err error
-	chatLogs := &[]ChatRoomLog{}
+	chatLogs := []ChatRoomLog{}
 
 	result := s.db.DB.Where(ChatRoomLog{RoomID: roomID}).Find(&chatLogs)
 	err = result.Error
-
+	// fmt.Println("(*chatLogs)[0].From", (*chatLogs)[0].From, (*chatLogs)[0].UserID)
 	return chatLogs, err
 }

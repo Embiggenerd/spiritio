@@ -1,0 +1,124 @@
+philosophy: "
+    An API for enabling live chat and video conferencing
+
+    ## Message types
+
+    ### Problem
+
+    - Since this is an event driven architecture, the first problem is how do we
+    treat messages sent between client and server.
+
+    ### Solution 1
+
+    - The lowest hanging fruit is to impose a request/reply philosophy, where
+    everything from the user is a request, and the server replies.
+
+    ### Problem
+
+    If a user broadcasts a message to a room of ten, are the other nine users
+    receiving a `reply` from the server? They never requested a message. With
+    events, a 1:1 relationship doesn't work.
+
+    ### Solution 2
+
+    - It's best to look at the relationship between a server and client
+    similarly to two people, with one taking direction from another.
+
+    - Jack needs to do some work, so he offloads it to Ryan. He tells Ryan to go
+    park his car. Ryan then asks a question, `where do you want it parked`? A
+    new work order is produced and sent to the server, `on the side of the road`
+    The `Car was parked on the side of the road` event is then triggered, and
+    it's completion broadcast.
+
+    - The work orders (from client to server) and the question (from server to
+    client) are not treated as events, and neither is a question `answered`. An
+    event is simply the result of a work order, which may or may not have been"
+work_orders:
+    request_media:
+        properties:
+            order: request_media
+            details:
+                audio: boolean
+                video: boolean
+        desc:
+            Provides an SDP (RFC5245) formatted string to the server. Contains
+            info relevant to creating a connection.
+
+    offer:
+        properties:
+            order: offer
+            details: string
+        desc:
+            A string formatted SDP (RFC 2327) in SDP for the purpose of
+            connecting.
+
+    candidate:
+        properties:
+            order: candidate
+            details: string
+        desc: Provides an ICE candidate according to RFC5245 to the server.
+
+    answer:
+        properties:
+            order: answer
+            details: string
+        desc:
+            Provides an SDP (RFC 2327) string in response to the offer and any
+            candidates.
+
+    user_message:
+        properties:
+            order: user_message
+            details: string
+        desc: A message from a user to be broadcast to the room.
+
+    validate_access_token:
+        properties:
+            order: validate_access_token
+            details: string
+        desc: A JWT to be validated by the server.
+
+events:
+    candidate:
+        properties:
+            event: candidate
+            data: string
+        desc: Provides an ICE candidate according to RFC5245 to the client.
+
+     offer:
+        properties:
+            event: offer
+            data: string
+        desc:
+            A string formatted SDP (RFC 2327) in SDP for the purpose of
+            connecting.
+
+    answer:
+        properties:
+            event: answer
+            data: string
+        desc:
+            Provides an SDP (RFC 2327) string in response to the offer and any
+            candidates.
+
+    user_message:
+        properties:
+            event: user_message
+            data: string
+        desc: A message from a user that was broadcast to the room.
+
+    joined_room:
+        properties:
+            event: joined_room
+            data:
+                chatLog: array of chatLogs
+      
+                  
+
+
+types:
+  chatLog:
+      text: string
+      user_name: string
+      user_id: uint
+      user_verified: boolean

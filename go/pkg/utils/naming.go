@@ -1,7 +1,8 @@
 package utils
 
 import (
-	"math/rand"
+	"math/rand/v2"
+	"strconv"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -1336,9 +1337,10 @@ var animals = []string{
 
 func RandName() string {
 	name := ""
-	a := adjectives[rand.Intn(len(adjectives))]
-	n := animals[rand.Intn(len(animals))]
-	name = a + " " + n
+	adj := adjectives[rand.IntN(len(adjectives))]
+	ani := animals[rand.IntN(len(animals))]
+	num := strconv.Itoa(rand.IntN(100))
+	name = adj + "_" + ani + num
 
 	return cases.Title(language.English).String(name)
 }

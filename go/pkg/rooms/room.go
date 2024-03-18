@@ -1,6 +1,7 @@
 package rooms
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Embiggenerd/spiritio/pkg/sfu"
@@ -9,6 +10,7 @@ import (
 	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
 	"github.com/Embiggenerd/spiritio/types"
 	"github.com/pion/webrtc/v3"
+	"gorm.io/gorm"
 )
 
 type Room interface {
@@ -19,10 +21,10 @@ type Room interface {
 }
 
 type ChatRoom struct {
-	ID       uint           `gorm:"primaryKey"`
-	SFU      sfu.SFU        `gorm:"-:all"`
-	ChatLog  *[]ChatRoomLog `gorm:"-:all"`
-	Visitors []*Visitor     `gorm:"-:all"`
+	ID       uint          `gorm:"primaryKey"`
+	SFU      sfu.SFU       `gorm:"-:all"`
+	ChatLog  []ChatRoomLog `gorm:"-:all"`
+	Visitors []*Visitor    `gorm:"-:all"`
 }
 
 func (r *ChatRoom) AddPeerConnection(pc *webrtc.PeerConnection, w *websocketClient.ThreadSafeWriter) {
@@ -31,7 +33,7 @@ func (r *ChatRoom) AddPeerConnection(pc *webrtc.PeerConnection, w *websocketClie
 
 func (r *ChatRoom) Build() {
 	if r.ChatLog == nil {
-		r.ChatLog = &[]ChatRoomLog{}
+		r.ChatLog = []ChatRoomLog{}
 	}
 
 	r.SFU = sfu.NewSelectiveForwardingUnit()
@@ -54,11 +56,12 @@ func (r *ChatRoom) AddVisitor(visitor *Visitor) {
 }
 
 type Visitor struct {
-	User           *users.User
-	Host           bool
-	Client         *websocketClient.WebsocketClient
-	PeerConnection *webrtc.PeerConnection
-	DisplayName    string
+	gorm.Model
+	User           *users.User `gorm:"foreignKey:UserID"`
+	UserID         uint
+	Host           bool                             `gorm:"-:all"`
+	Client         *websocketClient.WebsocketClient `gorm:"-:all"`
+	PeerConnection *webrtc.PeerConnection           `gorm:"-:all"`
 }
 
 func (r *ChatRoom) CreateUniqueDisplayName() string {
@@ -68,9 +71,11 @@ func (r *ChatRoom) CreateUniqueDisplayName() string {
 func (r *ChatRoom) untilUnique(name string) string {
 	unique := true
 	for _, v := range r.Visitors {
-		if name == v.DisplayName {
-			unique = false
-			break
+		if v.User != nil {
+			if name == v.User.Name {
+				unique = false
+				break
+			}
 		}
 	}
 
@@ -81,8 +86,14 @@ func (r *ChatRoom) untilUnique(name string) string {
 }
 
 func (v *Visitor) Clarify(ask string) error {
+	fmt.Println("clarifying", ask)
+
 	question := &types.Question{
 		Ask: ask,
 	}
 	return v.Client.Writer.WriteJSON(question)
+}
+
+func (v *Visitor) Notify(event *types.Event) error {
+	return v.Client.Writer.WriteJSON(event)
 }

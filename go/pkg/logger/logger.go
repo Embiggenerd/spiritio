@@ -32,9 +32,9 @@ type Logger interface {
 	LoggingMW(next http.Handler) http.Handler
 	LogAPIRequest(id, ip, path, port, method string, timeRecieved time.Time, nanoSeconds int64, statusCode int)
 	LogRequestError(requestID, errorMessage string, statusCode int)
-	// logMessage(requestID, metadata, direction, message, data string)
-	LogMessageSent(requestID, metadata string, message *types.WebsocketMessage)
-	LogWorkOrderReceived(requestID, metadata string, workOrder *types.WorkOrder)
+	// logMessage(ctx context.Context direction, message, data string)
+	LogMessageSent(ctx context.Context, message *types.WebsocketMessage)
+	LogWorkOrderReceived(ctx context.Context, workOrder *types.WorkOrder)
 }
 
 // replaceAttr masks data from requests and metadata from context
@@ -134,33 +134,38 @@ func (l *CustomLogger) LogRequestError(requestID, errorMessage string, statusCod
 	)
 }
 
-func (l *CustomLogger) LogMessageSent(requestID, metadata string, message *types.WebsocketMessage) {
+func (l *CustomLogger) LogMessageSent(ctx context.Context, message *types.WebsocketMessage) {
 	d, err := json.Marshal(message.Data)
 	if err != nil {
 		l.Error(err.Error())
 		return
 	}
 
-	l.logMessage(requestID, metadata, "Sent", message.Type, string(d))
+	l.logMessage(ctx, "Sent", message.Type, string(d))
 }
 
-func (l *CustomLogger) LogWorkOrderReceived(requestID, metadata string, workOrder *types.WorkOrder) {
+func (l *CustomLogger) LogWorkOrderReceived(ctx context.Context, workOrder *types.WorkOrder) {
+
 	d, err := json.Marshal(workOrder.Details)
 	if err != nil {
 		l.Error(err.Error())
 		return
 	}
 
-	l.logMessage(requestID, metadata, "Received", workOrder.Order, string(d))
+	l.logMessage(ctx, "Received", workOrder.Order, string(d))
 }
-func (l *CustomLogger) logMessage(requestID, metadata, direction, messageType, data string) {
+func (l *CustomLogger) logMessage(ctx context.Context, direction, messageType, data string) {
+	metadata := utils.ExposeContextMetadata(ctx)
+	metadataJSON := metadata.ToJSON()
+	requestID, _ := metadata.Get("requestID")
+
 	l.Log(
 		context.TODO(),
 		slog.LevelInfo,
 		"Event Message "+direction,
-		slog.String("requestID", requestID),
+		slog.String("requestID", requestID.(string)),
 		slog.String("type", messageType),
 		slog.String("data", data),
-		slog.String("metadata", metadata),
+		slog.String("metadata", metadataJSON),
 	)
 }

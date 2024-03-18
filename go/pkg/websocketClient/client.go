@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/Embiggenerd/spiritio/pkg/logger"
-	"github.com/Embiggenerd/spiritio/pkg/utils"
 	"github.com/Embiggenerd/spiritio/types"
 	"github.com/gorilla/websocket"
 )
@@ -44,9 +43,6 @@ func (t *ThreadSafeWriter) WriteJSON(v interface{}) error {
 	t.Lock()
 	defer t.Unlock()
 
-	md := utils.ExposeContextMetadata(t.ctx)
-	mdJSON := md.ToJSON()
-	reqID, _ := md.Get("requestID")
 	message := &types.WebsocketMessage{
 		Data: v,
 	}
@@ -59,7 +55,7 @@ func (t *ThreadSafeWriter) WriteJSON(v interface{}) error {
 		// fmt.Println("type&&", ty)
 	}
 	fmt.Println("type&", reflect.TypeOf(v))
-	t.log.LogMessageSent(reqID.(string), mdJSON, message)
+	t.log.LogMessageSent(t.ctx, message)
 
 	return t.Conn.WriteJSON(message)
 }
@@ -77,7 +73,12 @@ type JoinRoomWebsocketMessage struct {
 }
 
 type JoinRoomData struct {
-	RoomID  uint     `json:"room_id,omitempty"`
-	ChatLog []string `json:"chat_log,omitempty"`
-	Name    string   `json:"name,omitempty"`
+	RoomID  uint      `json:"room_id,omitempty"`
+	ChatLog []ChatLog `json:"chat_log"`
+	Name    string    `json:"name,omitempty"`
+}
+
+type ChatLog struct {
+	Text string
+	From string
 }

@@ -1,17 +1,18 @@
 const chatMessage = {
-    id: 'chat-message',
     type: 'div',
     classList: ['chat-message'],
-    create: function (message) {
+    create: function (text, from) {
         const element = document.createElement(this.type)
         this.classList.forEach((c) => {
             element.classList.add(c)
         })
+
         if (message) {
             const p = document.createElement('p')
-            p.innerText = message
+            p.innerText = `${from}: ${text}`
             element.append(p)
         }
+
         return element
     },
 }
@@ -29,7 +30,10 @@ const chatLog = {
         return element
     },
     addMessage: function (message) {
-        const messageElement = chatMessage.create(message)
+        const messageElement = chatMessage.create(
+            message.text,
+            message.from || message.user_name || message.name
+        )
         const element = document.getElementById(this.id)
         element.prepend(messageElement)
     },
@@ -38,17 +42,22 @@ const chatLog = {
 const chatInput = {
     zIndex: 2000,
     id: 'chat-form',
+    inputID: 'message',
     templateID: 'chat-input-template',
     type: 'text-area',
     create: function () {
         const template = document.getElementById(this.templateID)
         const clone = template.content.firstElementChild.cloneNode(true)
         clone.style.zIndex = this.zIndex
+        clone.setAttribute('autocomplete', 'off')
         clone.id = this.id
         return clone
     },
     getElement() {
         return document.getElementById(this.id)
+    },
+    getInputElement() {
+        return document.getElementById(this.inputID)
     },
 }
 

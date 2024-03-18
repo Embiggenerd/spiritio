@@ -34,9 +34,9 @@ func (c *RoomsCache) GetRoom(roomID uint) (*ChatRoom, error) {
 func (c *RoomsCache) UpdateChatLogs(roomID uint, chatRoomLog *ChatRoomLog) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	currentChatLogs := *c.table[roomID].ChatLog
+	currentChatLogs := c.table[roomID].ChatLog
 	newChatLogs := append(currentChatLogs, *chatRoomLog)
-	c.table[roomID].ChatLog = &newChatLogs
+	c.table[roomID].ChatLog = newChatLogs
 }
 
 type RoomsTable map[uint]*ChatRoom

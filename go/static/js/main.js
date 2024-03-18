@@ -3,12 +3,12 @@ import media from './entities/media.js'
 import message from './entities/message.js'
 import appComponent from './component.js'
 
-let renderer = null
-
 try {
-    renderer = render()
-    await appComponent.init(renderer, message, media)
+    await appComponent.init(render, message, media)
 } catch (e) {
     console.log(e)
-    renderer.chatLog.addMessage('ADMIN (to you): ' + e)
+    renderer.chatLog.addMessage({
+        text: e,
+        from: 'ADMIN (to you)',
+    })
 }
