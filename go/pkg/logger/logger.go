@@ -39,7 +39,7 @@ type Logger interface {
 
 // replaceAttr masks data from requests and metadata from context
 func replaceAttr(_ []string, a slog.Attr) slog.Attr {
-	if a.Key == "data" || a.Key == "metadata" {
+	if a.Key == "metadata" {
 		a = slog.Attr{}
 	}
 	return a

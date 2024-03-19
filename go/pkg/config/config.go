@@ -18,9 +18,8 @@ type Config struct {
 }
 
 func GetConfig() *Config {
-	flag.Parse()
-
 	var goEnv = flag.String("go_env", "dev", "which environment")
+	flag.Parse()
 
 	err := godotenv.Load("pkg/config/" + *goEnv + ".env")
 	if err != nil {
