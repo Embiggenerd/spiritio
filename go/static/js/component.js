@@ -4,71 +4,84 @@ const component = {
     media: null,
 
     init: async function (render, message, media) {
-        this.renderer = render()
-        this.message = message.init()
-        // Add user message send capability to chat input
-        this.assignHandleChatInput()
-        this.message.assignCallbacks(
-            this.handleOpen.bind(this),
-            this.handleMessageError.bind(this),
-            this.handleMessage.bind(this),
-            this.handleClose.bind(this)
-        )
-        this.media = await media.init()
-        // show local video
-        this.renderer.videoAreaOverlay.addVideo(this.media.stream)
-        // Add tracks to peer connection
-        this.media.addTrack()
-        // Tell peerConnection what to do when it recieves a candidate and track
-        this.media.assignCallbacks(
-            this.handleOnTrack.bind(this),
-            this.handleIceCandidate.bind(this)
-        )
-        // Order media capabilities from backend
-        this.orderMedia()
+        try {
+            this.renderer = render()
+            this.message = message.init()
+            // Add user message send capability to chat input
+            this.assignHandleChatInput()
+            this.message.assignCallbacks(
+                this.handleOpen.bind(this),
+                this.handleMessageError.bind(this),
+                this.handleMessage.bind(this),
+                this.handleClose.bind(this)
+            )
+            this.media = await media.init()
+            // show local video
+            this.renderer.videoArea.addVideo(this.media.stream)
+            // Add tracks to peer connection
+            this.media.addTrack()
+            // Tell peerConnection what to do when it recieves a candidate and track
+            this.media.assignCallbacks(
+                this.handleOnTrack.bind(this),
+                this.handleIceCandidate.bind(this)
+            )
+            // Order media capabilities from backend
+            this.orderMedia()
+        } catch (e) {
+            this.handleError(e)
+        }
     },
 
     assignHandleChatInput: function () {
-        const chatFormElement = this.renderer.chatInput.getElement()
-        if (chatFormElement) {
-            chatFormElement.onsubmit = this.onChatSubmit.bind(this)
-            const chatInputElement = this.renderer.chatInput.getInputElement()
-            this.setOnChatKeyDown(chatInputElement)
+        try {
+            const chatFormElement = this.renderer.chatInput.getElement()
+            if (chatFormElement) {
+                chatFormElement.onsubmit = this.onChatSubmit.bind(this)
+                const chatInputElement =
+                    this.renderer.chatInput.getInputElement()
+                this.setOnChatKeyDown(chatInputElement)
+            }
+        } catch (e) {
+            this.handleError(e)
         }
     },
 
     setOnChatKeyDown: function (chatInputElement) {
-        if (!chatInputElement) {
-            throw new Error('chat input element not found')
-        }
+        try {
+            if (!chatInputElement) {
+                throw new Error('chat input element not found')
+            }
 
-        const up = 38
-        const down = 40
-        const commandLog = this.getCommandLog()
-        const lenCommands = commandLog.length - 1
-        const empty = ''
-        let i = -1
+            const up = 38
+            const down = 40
+            const commandLog = this.getCommandLog()
+            const lenCommands = commandLog.length - 1
+            const empty = ''
+            let i = -1
 
-        chatInputElement.onkeydown = (event) => {
-            if (event.keyCode === up || event.keyCode === down) {
-                if (event.keyCode === up) {
-                    i--
-                }
-                if (event.keyCode === down) {
-                    i++
-                }
-                if (i < -1) {
-                    i = lenCommands
-                }
-                if (i > lenCommands) {
-                    i = -1
-                }
-                if (i === -1) {
-                    event.target.value = empty
-                } else {
-                    event.target.value = commandLog[i]
+            chatInputElement.onkeydown = (event) => {
+                if (event.keyCode === up || event.keyCode === down) {
+                    if (event.keyCode === up) {
+                        i--
+                    }
+                    if (event.keyCode === down) {
+                        i++
+                    }
+                    if (i < -1) {
+                        i = lenCommands
+                    }
+                    if (i > lenCommands) {
+                        i = -1
+                    }
+                    if (i === -1) {
+                        event.target.value = empty
+                    } else {
+                        event.target.value = commandLog[i]
+                    }
                 }
             }
+        } catch (e) {
+            this.handleError(e)
         }
     },
 
@@ -102,22 +115,28 @@ const component = {
     },
 
     handleOnTrack: function (e) {
-        if (e.track.kind === 'audio') {
-            return
-        }
-        // Add a video to the screen for every track
-        const videoElement = this.renderer.videoAreaOverlay.addVideo(
-            e.streams[0]
-        )
-        // Videos are muted by default
-        e.track.onmute = function () {
-            videoElement.play()
-        }
-        // define this in the renderer
-        e.streams[0].onremovetrack = () => {
-            if (videoElement.parentNode) {
-                videoElement.parentNode.removeChild(videoElement)
+        try {
+            if (e.track.kind === 'audio') {
+                return
             }
+            const stream = e.streams[0]
+            if (stream) {
+                this.orderWork('identify_streamid', stream.id)
+            }
+            // Add a video to the screen for every track
+            const videoElement = this.renderer.videoArea.addVideo(e.streams[0])
+            // Videos are muted by default
+            e.track.onmute = function () {
+                videoElement.play()
+            }
+            // Remove the video wrapper around the video to remove text overlay
+            e.streams[0].onremovetrack = () => {
+                if (videoElement.parentNode) {
+                    videoElement.parentNode.remove()
+                }
+            }
+        } catch (e) {
+            this.handleError(e)
         }
     },
 
@@ -129,16 +148,20 @@ const component = {
     },
 
     handleMessage: async function (event) {
-        const message = JSON.parse(event.data)
-        if (!message) {
-            throw new Error('failed to parse message ' + event.data)
-        }
-        console.log('recieved message', message.type, message.data)
-        if (message.type == 'event') {
-            await this.handleEvent(message.data.event, message.data.data)
-        }
-        if (message.type == 'question') {
-            this.handleQuestion(message.data.ask)
+        try {
+            const message = JSON.parse(event.data)
+            console.log('message', message)
+            if (!message) {
+                throw new Error('failed to parse message ' + event.data)
+            }
+            if (message.type == 'event') {
+                await this.handleEvent(message.data.event, message.data.data)
+            }
+            if (message.type == 'question') {
+                this.handleQuestion(message.data.ask)
+            }
+        } catch (e) {
+            this.handleError(e)
         }
     },
 
@@ -172,8 +195,7 @@ const component = {
     },
 
     handleClose: function () {
-        // this.orderWork('close_connection', '')
-        this.media.closePeerConnection()
+        this.renderer.videoArea.removeRemote()
         this.renderer.chatLog.addMessage({
             text: 'unable to receive messages',
             from: 'ADMIN (to you)',
@@ -193,72 +215,92 @@ const component = {
     },
 
     handleEvent: async function (event, data) {
-        if (event == 'candidate') {
-            let candidate = JSON.parse(data)
-            if (!candidate) {
-                throw new Error('failed to parse candidate')
+        try {
+            if (event == 'candidate') {
+                let candidate = JSON.parse(data)
+                if (!candidate) {
+                    throw new Error('failed to parse candidate')
+                }
+                this.media.addCandidate(candidate)
+                return
             }
-            this.media.addCandidate(candidate)
-            return
-        }
 
-        if (event == 'offer') {
-            let offer = JSON.parse(data)
-            if (!offer) {
-                throw new Error('failed to parse answer')
+            if (event == 'offer') {
+                let offer = JSON.parse(data)
+                if (!offer) {
+                    throw new Error('failed to parse answer')
+                }
+                this.media.setRemoteDescription(offer)
+                const answer = await this.media.createAnswer()
+                this.media.setLocalDescription(answer)
+
+                this.orderWork('answer', JSON.stringify(answer))
             }
-            this.media.setRemoteDescription(offer)
-            const answer = await this.media.createAnswer()
-            this.media.setLocalDescription(answer)
 
-            this.orderWork('answer', JSON.stringify(answer))
-        }
+            if (event === 'joined_room') {
+                const chatLog = data.chat_log
+                if (chatLog && chatLog.length) {
+                    let i = 0
+                    while (i < chatLog.length) {
+                        this.renderer.chatLog.addMessage(chatLog[i])
+                        i = i + 1
+                    }
+                }
+                return
+            }
 
-        if (event === 'joined_room') {
-            const chatLog = data.chat_log
-            if (chatLog && chatLog.length) {
-                let i = 0
-                while (i < chatLog.length) {
-                    this.renderer.chatLog.addMessage(chatLog[i])
-                    i = i + 1
+            if (event === 'created_room') {
+                const urlParams = new URLSearchParams(window.location.search)
+                urlParams.set('room', data)
+                window.location.search = urlParams
+                return
+            }
+
+            if (event === 'user_message') {
+                this.renderer.chatLog.addMessage(data)
+                return
+            }
+
+            if (event === 'user_logged_in') {
+                localStorage.setItem('access_token', data.access_token)
+                const message = {
+                    from: `ADMIN (to you)`,
+                    text: `logged in as ${data.name}`,
+                }
+                this.renderer.chatLog.addMessage(message)
+            }
+
+            if (event === 'user_name_change') {
+                this.renderer.chatLog.addMessage({
+                    from: 'ADMIN (to you): ',
+                    text: `Name changed to ${data}`,
+                })
+            }
+
+            if (event === 'error') {
+                console.error(data)
+                if (data.public) {
+                    this.handleError(data.message)
                 }
             }
-            return
-        }
 
-        if (event === 'created_room') {
-            const urlParams = new URLSearchParams(window.location.search)
-            urlParams.set('room', data)
-            window.location.search = urlParams
-            return
-        }
-
-        if (event === 'user_message') {
-            this.renderer.chatLog.addMessage(data)
-            return
-        }
-
-        if (event === 'user_logged_in') {
-            localStorage.setItem('access_token', data.access_token)
-            const message = {
-                from: `ADMIN (to you)`,
-                text: `logged in as ${data.name}`,
+            if (event === 'streamid_user_name') {
+                this.renderer.videoArea.identifyStream(
+                    data.stream_id,
+                    data.name
+                )
             }
-            this.renderer.chatLog.addMessage(message)
-        }
 
-        if (event === 'user_name_change') {
-            this.renderer.chatLog.addMessage({
-                from: 'ADMIN (to you): ',
-                text: `Name changed to ${data}`,
-            })
-        }
-
-        if (event === 'error') {
-            console.error(data)
-            if (data.public) {
-                this.handleError(data.message)
+            if (event === 'user_joined_chat') {
+                const text = `${data} has joined the chat`
+                const message = {
+                    text,
+                    from: 'ADMIN',
+                }
+                this.renderer.chatLog.addMessage(message)
             }
+        } catch (e) {
+            this.handleError(e)
         }
     },
 
@@ -352,7 +394,6 @@ const component = {
         }
         // Find any words that are in the list of possible commands
         function parseCommand(word) {
-            // if (commandElements.includes(word.toLowerCase())) {
             workOrderKey = workOrderKey + ' ' + word
             workOrderKey = workOrderKey.trim()
             if (

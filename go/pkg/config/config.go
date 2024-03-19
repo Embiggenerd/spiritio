@@ -10,10 +10,11 @@ import (
 )
 
 type Config struct {
-	DatabaseName      string `default:"dev.db"`
-	Addr              string `default:":8080"`
-	LogFileName       string `default:"dev.log"`
-	AccessTokenSecret string `default:"our_secret"`
+	DatabaseName       string `default:"dev.db"`
+	Addr               string `default:":8080"`
+	LogFileName        string `default:"dev.log"`
+	AccessTokenSecret  string `default:"our_secret"`
+	MaxPeerConnections int    `default:"4"`
 }
 
 func GetConfig() *Config {

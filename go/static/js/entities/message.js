@@ -7,7 +7,6 @@ const message = {
         return this
     },
     sendMessage: function (message) {
-        console.log({ sending_message: message })
         this.conn.send(JSON.stringify(message))
     },
     connect: function () {

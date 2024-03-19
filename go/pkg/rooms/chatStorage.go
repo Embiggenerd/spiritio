@@ -36,6 +36,5 @@ func (s *ChatLogStorage) GetChatLogsByRoomID(roomID uint) ([]ChatRoomLog, error)
 
 	result := s.db.DB.Where(ChatRoomLog{RoomID: roomID}).Find(&chatLogs)
 	err = result.Error
-	// fmt.Println("(*chatLogs)[0].From", (*chatLogs)[0].From, (*chatLogs)[0].UserID)
 	return chatLogs, err
 }

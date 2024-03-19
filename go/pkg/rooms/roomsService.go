@@ -2,7 +2,6 @@ package rooms
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/Embiggenerd/spiritio/pkg/config"
 	"github.com/Embiggenerd/spiritio/pkg/db"
@@ -16,6 +15,7 @@ func NewRoomsService(ctx context.Context, cfg *config.Config, log logger.Logger,
 	db.DB.AutoMigrate(&Visitor{})
 	roomsTable := make(RoomsTable)
 	rooms := &ChatRoomsService{
+		cfg:         cfg,
 		cache:       &RoomsCache{table: roomsTable},
 		DB:          db,
 		RoomStorage: &RoomStorage{db: db},
@@ -35,17 +35,17 @@ type ChatRoomsService struct {
 	DB          *db.Database
 	RoomStorage RoomStore
 	ChatStorage ChatLogStore
+	cfg         *config.Config
 }
 
 // CreateRoom creates a new room
 func (r *ChatRoomsService) CreateRoom(ctx context.Context) (*ChatRoom, error) {
 	newRoom, err := r.RoomStorage.CreateRoom(ctx)
-	fmt.Println("createRoomErr", err)
 	if err != nil {
 		return newRoom, err
 	}
 
-	newRoom.Build()
+	newRoom.Build(ctx, r)
 
 	r.cache.AddRoom(newRoom)
 	return newRoom, err
@@ -55,16 +55,14 @@ func (r *ChatRoomsService) GetRoomByID(roomID uint) (*ChatRoom, error) {
 	room, err := r.cache.GetRoom(roomID)
 	if err != nil {
 		room, err = r.RoomStorage.FindRoomByID(roomID)
-		fmt.Println("getRoomErr", err)
 		if err != nil {
 			return room, err
 		}
 		chatLog, _ := r.ChatStorage.GetChatLogsByRoomID(roomID)
 		room.ChatLog = chatLog
-		room.Build()
+		room.Build(context.TODO(), r)
 		r.cache.AddRoom(room)
 	}
-	fmt.Println("getRoomErr", err)
 	return room, err
 }
 

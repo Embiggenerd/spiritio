@@ -2,7 +2,6 @@ package sfu
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -21,6 +20,7 @@ type SFU interface {
 	RemoveTrack(t *webrtc.TrackLocalStaticRTP)
 	CreatePeerConnection() (*webrtc.PeerConnection, error)
 	BroadcastMessage(message *types.WebsocketMessage)
+	CountPeerConnections() int
 }
 
 type SFUService struct {
@@ -44,9 +44,7 @@ func (s *SFUService) AddPeerConnection(pc *webrtc.PeerConnection, w *websocketCl
 func (s *SFUService) BroadcastMessage(message *types.WebsocketMessage) {
 	// Send message to each client subbed to this peer's peerConnections
 	for i := range s.PeerConnections {
-		if err := s.PeerConnections[i].Websocket.WriteJSON(message); err != nil {
-			// log.Error(err.Error())
-		}
+		s.PeerConnections[i].Websocket.WriteJSON(message)
 	}
 }
 
@@ -196,7 +194,6 @@ type PeerConnectionState struct {
 }
 
 func (s *SFUService) CreatePeerConnection() (*webrtc.PeerConnection, error) {
-	fmt.Print("CreatePeerConnection()")
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
 		log.Print(err)
@@ -211,4 +208,8 @@ func (s *SFUService) CreatePeerConnection() (*webrtc.PeerConnection, error) {
 		}
 	}
 	return peerConnection, err
+}
+
+func (s *SFUService) CountPeerConnections() int {
+	return len(s.PeerConnections)
 }

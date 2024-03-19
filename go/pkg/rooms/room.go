@@ -1,40 +1,42 @@
 package rooms
 
 import (
-	"fmt"
+	"context"
 	"time"
 
+	"github.com/Embiggenerd/spiritio/pkg/config"
 	"github.com/Embiggenerd/spiritio/pkg/sfu"
-	"github.com/Embiggenerd/spiritio/pkg/users"
 	"github.com/Embiggenerd/spiritio/pkg/utils"
 	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
 	"github.com/Embiggenerd/spiritio/types"
 	"github.com/pion/webrtc/v3"
-	"gorm.io/gorm"
 )
 
 type Room interface {
-	Build()
+	Build(ctx context.Context, cfg *config.Config)
 	AddPeerConnection(pc *webrtc.PeerConnection, w *websocketClient.ThreadSafeWriter)
 	BroadcastEvent(event *types.Event)
 	AddVisitor(visitor *Visitor)
 }
 
 type ChatRoom struct {
-	ID       uint          `gorm:"primaryKey"`
-	SFU      sfu.SFU       `gorm:"-:all"`
-	ChatLog  []ChatRoomLog `gorm:"-:all"`
-	Visitors []*Visitor    `gorm:"-:all"`
+	Service  *ChatRoomsService `gorm:"-:all"`
+	ID       uint              `gorm:"primaryKey"`
+	SFU      sfu.SFU           `gorm:"-:all"`
+	ChatLog  []ChatRoomLog     `gorm:"-:all"`
+	Visitors []*Visitor        `gorm:"-:all"`
 }
 
 func (r *ChatRoom) AddPeerConnection(pc *webrtc.PeerConnection, w *websocketClient.ThreadSafeWriter) {
 	r.SFU.AddPeerConnection(pc, w)
 }
 
-func (r *ChatRoom) Build() {
+func (r *ChatRoom) Build(ctx context.Context, service *ChatRoomsService) {
 	if r.ChatLog == nil {
 		r.ChatLog = []ChatRoomLog{}
 	}
+
+	r.Service = service
 
 	r.SFU = sfu.NewSelectiveForwardingUnit()
 	go func() {
@@ -53,15 +55,6 @@ func (r *ChatRoom) BroadcastEvent(event *types.Event) {
 func (r *ChatRoom) AddVisitor(visitor *Visitor) {
 
 	r.Visitors = append(r.Visitors, visitor)
-}
-
-type Visitor struct {
-	gorm.Model
-	User           *users.User `gorm:"foreignKey:UserID"`
-	UserID         uint
-	Host           bool                             `gorm:"-:all"`
-	Client         *websocketClient.WebsocketClient `gorm:"-:all"`
-	PeerConnection *webrtc.PeerConnection           `gorm:"-:all"`
 }
 
 func (r *ChatRoom) CreateUniqueDisplayName() string {
@@ -83,17 +76,4 @@ func (r *ChatRoom) untilUnique(name string) string {
 		return r.untilUnique(utils.RandName())
 	}
 	return name
-}
-
-func (v *Visitor) Clarify(ask string) error {
-	fmt.Println("clarifying", ask)
-
-	question := &types.Question{
-		Ask: ask,
-	}
-	return v.Client.Writer.WriteJSON(question)
-}
-
-func (v *Visitor) Notify(event *types.Event) error {
-	return v.Client.Writer.WriteJSON(event)
 }

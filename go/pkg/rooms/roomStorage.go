@@ -8,7 +8,6 @@ import (
 
 type RoomStore interface {
 	CreateRoom(ctx context.Context) (*ChatRoom, error)
-	// SaveChatlog(text string, room *Room) *ChatLog
 	FindRoomByID(roomID uint) (*ChatRoom, error)
 }
 

@@ -1,49 +1,120 @@
 @import url('normalize.css');
 @import url('https://fonts.googleapis.com/css2?family=Muli:wght@400;700&display=swap');
 
-.chat {
+body {
+    font-family: Muli, Arial, Helvetica, sans-serif;
+    font-size: 17px;
     height: 100vh;
-    width: 100vw;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+.container {
+    height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 20px;
+}
+
+.video-area {
+    padding: 10px;
+    background: transparent;
     box-sizing: border-box;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+}
+
+.video-wrapper {
+    display: inline-block;
+    position: relative;
+    background: transparent;
+    z-index: 1000;
+    margin: 0;
+    padding: 0;
+}
+
+.text-overlay {
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%, 0);
+    background: white;
+    opacity: 0.3;
+    bottom: 20px;
+    font-size: 18px;
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+}
+
+.video {
+    width: 184px;
+    height: 138px;
+    padding: 6px;
+}
+
+.chat-log {
+    padding: 10px;
+    display: flex;
+    flex-direction: column-reverse;
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.chat-message {
+    width: 100%;
+    padding: 3px;
+}
+
+.chat-message > p {
+    margin: 0;
+    word-break: break-all;
+}
+
+.bold {
+    font-weight: bold;
+}
+
+#chat-form {
+    margin: 10px;
 }
 
 .chat-input {
     height: 50px;
     width: 100%;
-    padding: 10px;
     border-radius: 10px;
     border: 1px lightgray dotted;
 }
 
-.chat-log {
-    width: 100%;
-    height: 100%;
-    padding: 10px;
-    display: flex;
-    flex-direction: column-reverse;
-    font-family: Muli, Arial, Helvetica, sans-serif;
-    font-size: 17px;
+@media only screen and (min-width: 500px) {
+    .video {
+        width: 240px;
+        height: 210px;
+    }
+    .text-overlay {
+        bottom: 40px;
+        font-size: 15px;
+    }
 }
 
-.chat-message {
-    width: 100%;
-    min-height: 20px;
+@media only screen and (min-width: 800px) {
+    .video {
+        width: 380px;
+        height: 330px;
+    }
+    .text-overlay {
+        bottom: 50px;
+        font-size: 12px;
+    }
 }
 
-.chat-message > p {
-    margin: 0;
-}
+@media only screen and (min-width: 1650px) {
+    .video {
+        width: 540px;
+        height: 470px;
+    }
 
-.video-area-overlay {
-    position: absolute;
-    top: 0;
-    height: 100vh;
-    width: 100vw;
-    background: transparent;
-    box-sizing: border-box;
-    padding: 20px;
-    z-index: 1000;
+    .text-overlay {
+        bottom: 55px;
+        font-size: 25px;
+    }
 }

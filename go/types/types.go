@@ -36,3 +36,14 @@ type ErrorData struct {
 	Message    string `json:"message,omitempty"`
 	Public     bool   `json:"public,omitempty"`
 }
+
+type UserLoggedInData struct {
+	Name        string `json:"name,omitempty"`
+	ID          uint   `json:"id,omitempty"`
+	AccessToken string `json:"access_token,omitempty"`
+}
+
+type StreamIDUserNameData struct {
+	StreamID string `json:"stream_id,omitempty"`
+	Name     string `json:"name,omitempty"`
+}

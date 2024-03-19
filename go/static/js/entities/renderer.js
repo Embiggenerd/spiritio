@@ -2,16 +2,20 @@ const chatMessage = {
     type: 'div',
     classList: ['chat-message'],
     create: function (text, from) {
+        const textSpan = document.createElement('span')
+        textSpan.innerText = text
+
+        const fromSpan = document.createElement('span')
+        fromSpan.classList.add('bold')
+        fromSpan.innerText = `${from}: `
+
         const element = document.createElement(this.type)
         this.classList.forEach((c) => {
             element.classList.add(c)
         })
 
-        if (message) {
-            const p = document.createElement('p')
-            p.innerText = `${from}: ${text}`
-            element.append(p)
-        }
+        element.appendChild(fromSpan)
+        element.appendChild(textSpan)
 
         return element
     },
@@ -61,10 +65,10 @@ const chatInput = {
     },
 }
 
-const chat = {
-    id: 'chat',
+const container = {
+    id: 'container',
     type: 'div',
-    classList: ['chat'],
+    classList: ['container'],
     root: 'root',
     create: function () {
         const element = document.createElement(this.type)
@@ -75,11 +79,11 @@ const chat = {
     },
 }
 
-const videoAreaOverlay = {
+const videoArea = {
     zIndex: 1000,
-    id: 'video-area-overlay',
+    id: 'video-area',
     type: 'div',
-    classList: ['video-area-overlay'],
+    classList: ['video-area'],
     create: function () {
         const element = document.createElement(this.type)
         this.classList.forEach((c) => {
@@ -90,12 +94,53 @@ const videoAreaOverlay = {
         return element
     },
     addVideo: function (stream) {
-        console.log({ stream })
-        const videoElement = video.create()
+        const videoWrapperElement = video.create()
+
+        const videoElement = videoWrapperElement.firstChild
         videoElement.srcObject = stream
+
         const element = document.getElementById(this.id)
-        element.append(videoElement)
+        element.append(videoWrapperElement)
+
         return videoElement
+    },
+    removeRemote: function () {
+        const children = Array.from(document.getElementById(this.id).children)
+        if (children.length > 1) {
+            let i = 1
+            while (i < children.length) {
+                if (children[i]) {
+                    children[i].remove()
+                    i++
+                }
+            }
+        }
+    },
+    identifyStream: function (streamID, name) {
+        console.log({ streamID, name })
+        const videoElements = Array.from(
+            document.getElementsByClassName('video')
+        )
+        videoElements.forEach((v) => {
+            if (v.srcObject.id === streamID) {
+                console.log('we got a match')
+                const textElement = document.createElement('div')
+                textElement.classList.add('text-overlay')
+
+                const text = document.createTextNode(name)
+                textElement.appendChild(text)
+
+                const wrapper = v.parentElement
+                // Remove existing overlay
+                Array.from(wrapper.children).forEach((c) => {
+                    if (c.classList.contains('text-overlay')) {
+                        c.remove()
+                    }
+                })
+
+                wrapper.appendChild(textElement)
+            }
+        })
     },
 }
 
@@ -103,12 +148,13 @@ const video = {
     type: 'video',
     classList: ['video'],
     attributes: {
-        width: '280',
-        height: '210',
         autoplay: 'true',
         controls: 'true',
     },
     create: function () {
+        const wrapperElement = document.createElement('div')
+        wrapperElement.classList.add('video-wrapper')
+
         const element = document.createElement(this.type)
         this.classList.forEach((c) => {
             element.classList.add(c)
@@ -117,30 +163,32 @@ const video = {
             element.setAttribute(key, val)
         }
         element.muted = true
-        return element
+        wrapperElement.appendChild(element)
+        return wrapperElement
     },
 }
 const render = () => {
+    const root = document.getElementById(container.root)
+
     // Render chat area
-    const chatRoot = document.getElementById(chat.root)
-    const chatElement = chat.create()
-    chatRoot.append(chatElement)
+    const containerElement = container.create()
+    root.append(containerElement)
+
+    // add area to contain video streams
+    const videoAreaElement = videoArea.create()
+    containerElement.append(videoAreaElement)
 
     // render chat log
     const chatLogElement = chatLog.create()
-    chatElement.append(chatLogElement)
+    containerElement.append(chatLogElement)
 
     // render chat input box
     const chatInputElement = chatInput.create()
-    chatElement.append(chatInputElement)
-
-    // add overlay to contain video streams
-    const videoArea = videoAreaOverlay.create()
-    chatRoot.append(videoArea)
+    containerElement.append(chatInputElement)
 
     return {
         chatLog,
-        videoAreaOverlay,
+        videoArea,
         chatInput,
     }
 }
