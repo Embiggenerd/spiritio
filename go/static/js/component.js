@@ -3,9 +3,10 @@ const component = {
     message: null,
     media: null,
 
-    init: async function (render, message, media) {
+    async init (render, message, media) {
         try {
             this.renderer = render()
+            this.media = await media.init()
             this.message = message.init()
             // Add user message send capability to chat input
             this.assignHandleChatInput()
@@ -15,7 +16,6 @@ const component = {
                 this.handleMessage.bind(this),
                 this.handleClose.bind(this)
             )
-            this.media = await media.init()
             // show local video
             this.renderer.videoArea.addVideo(this.media.stream)
             // Add tracks to peer connection
@@ -148,7 +148,6 @@ const component = {
     handleMessage: async function (event) {
         try {
             const message = JSON.parse(event.data)
-            console.log('message', message)
             if (!message) {
                 throw new Error('failed to parse message ' + event.data)
             }
@@ -186,9 +185,8 @@ const component = {
     },
 
     handleOpen: function () {
-	    console.log("ordering media")
 	    // Order media capabilities from backend
-            this.orderMedia()
+        this.orderMedia() 
 
         this.renderer.chatLog.addMessage({
             text: 'able to receive messages',
@@ -205,7 +203,6 @@ const component = {
     },
 
     orderMedia: function () {
-	    console.log("this.media", this.media)
         this.orderWork('media_request', this.media.constraints)
     },
 

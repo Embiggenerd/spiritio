@@ -5,12 +5,11 @@ const media = {
         audio: true,
     },
     stream: null,
-    init: async function () {
+    async init() {
         // Ask for mic and cam access, set media stream
-        this.stream = await navigator.mediaDevices.getUserMedia(
+         this.stream = await navigator.mediaDevices.getUserMedia(
             this.constraints
-        )
-	console.log("this.stream", this.stream)
+        )    
         // Create peer connection
         this.peerConnection = new RTCPeerConnection()
 

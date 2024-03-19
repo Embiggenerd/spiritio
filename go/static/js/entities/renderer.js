@@ -117,13 +117,11 @@ const videoArea = {
         }
     },
     identifyStream: function (streamID, name) {
-        console.log({ streamID, name })
         const videoElements = Array.from(
             document.getElementsByClassName('video')
         )
         videoElements.forEach((v) => {
             if (v.srcObject.id === streamID) {
-                console.log('we got a match')
                 const textElement = document.createElement('div')
                 textElement.classList.add('text-overlay')
 

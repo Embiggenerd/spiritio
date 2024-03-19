@@ -42,7 +42,7 @@ body {
     background: white;
     opacity: 0.3;
     bottom: 20px;
-    font-size: 18px;
+    font-size: 12px;
     font-family: 'Comic Sans MS', cursive, sans-serif;
 }
 
@@ -103,7 +103,7 @@ body {
     }
     .text-overlay {
         bottom: 50px;
-        font-size: 12px;
+        font-size: 20px;
     }
 }
 
