@@ -1,8 +1,8 @@
 build:
-	@go build -o ./bin/spiritio ./cmd
+	@CGO_ENABLED=1 go build  -o ./bin/spiritio ./cmd
 
 local:
-	go run ./cmd
+	CGO_ENABLED=1 go run ./cmd
 
 dev: build
 	@./bin/spiritio -go_env dev

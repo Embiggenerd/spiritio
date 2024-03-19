@@ -10,6 +10,7 @@ const media = {
         this.stream = await navigator.mediaDevices.getUserMedia(
             this.constraints
         )
+	console.log("this.stream", this.stream)
         // Create peer connection
         this.peerConnection = new RTCPeerConnection()
 

@@ -25,8 +25,6 @@ const component = {
                 this.handleOnTrack.bind(this),
                 this.handleIceCandidate.bind(this)
             )
-            // Order media capabilities from backend
-            this.orderMedia()
         } catch (e) {
             this.handleError(e)
         }
@@ -188,6 +186,10 @@ const component = {
     },
 
     handleOpen: function () {
+	    console.log("ordering media")
+	    // Order media capabilities from backend
+            this.orderMedia()
+
         this.renderer.chatLog.addMessage({
             text: 'able to receive messages',
             from: 'ADMIN (to you)',
@@ -203,6 +205,7 @@ const component = {
     },
 
     orderMedia: function () {
+	    console.log("this.media", this.media)
         this.orderWork('media_request', this.media.constraints)
     },
 
