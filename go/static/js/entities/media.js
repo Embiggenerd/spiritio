@@ -6,14 +6,17 @@ const media = {
     },
     stream: null,
     async init() {
-        // Ask for mic and cam access, set media stream
-         this.stream = await navigator.mediaDevices.getUserMedia(
-            this.constraints
-        )    
-        // Create peer connection
-        this.peerConnection = new RTCPeerConnection()
-
-        return this
+        try {
+            // Ask for mic and cam access, set media stream
+            this.stream = await navigator.mediaDevices.getUserMedia(
+                this.constraints
+            )
+            this.peerConnection = new RTCPeerConnection()
+            return this
+        } catch (e) {
+            // If rejected, return null
+            return null
+        } 
     },
     closePeerConnection: function () {
         this.stream.getTracks().forEach((s) => {

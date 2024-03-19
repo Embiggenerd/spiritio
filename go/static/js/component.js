@@ -3,7 +3,7 @@ const component = {
     message: null,
     media: null,
 
-    async init (render, message, media) {
+    async init(render, message, media) {
         try {
             this.renderer = render()
             this.media = await media.init()
@@ -16,15 +16,17 @@ const component = {
                 this.handleMessage.bind(this),
                 this.handleClose.bind(this)
             )
-            // show local video
-            this.renderer.videoArea.addVideo(this.media.stream)
-            // Add tracks to peer connection
-            this.media.addTrack()
-            // Tell peerConnection what to do when it recieves a candidate and track
-            this.media.assignCallbacks(
-                this.handleOnTrack.bind(this),
-                this.handleIceCandidate.bind(this)
-            )
+            if (this.media) {
+                // show local video
+                this.renderer.videoArea.addVideo(this.media.stream)
+                // Add tracks to peer connection
+                this.media.addTrack()
+                // Tell peerConnection what to do when it recieves a candidate and track
+                this.media.assignCallbacks(
+                    this.handleOnTrack.bind(this),
+                    this.handleIceCandidate.bind(this)
+                )
+            }
         } catch (e) {
             this.handleError(e)
         }
@@ -185,9 +187,9 @@ const component = {
     },
 
     handleOpen: function () {
-	    // Order media capabilities from backend
-        this.orderMedia() 
-
+        if (this.media) {
+            this.orderMedia()
+        }
         this.renderer.chatLog.addMessage({
             text: 'able to receive messages',
             from: 'ADMIN (to you)',
