@@ -1,11 +1,12 @@
 const component = {
     renderer: null,
     message: null,
+    mediaObject: null,
     media: null,
 
     async init(render, message, media) {
         try {
-            this.media = media
+            this.mediaObject = media
             this.renderer = render()
             this.message = message.init()
             // Add user message send capability to chat input
@@ -16,7 +17,6 @@ const component = {
                 this.handleMessage.bind(this),
                 this.handleClose.bind(this)
             )
-
         } catch (e) {
             this.handleError(e)
         }
@@ -208,27 +208,29 @@ const component = {
 
     handleEvent: async function (event, data) {
         try {
-            if (event == 'candidate') {
-                let candidate = JSON.parse(data)
-                if (!candidate) {
-                    throw new Error('failed to parse candidate')
+            // Server will send offers regardless if we ask
+            if (this.media) {
+                if (event == 'candidate') {
+                    let candidate = JSON.parse(data)
+                    if (!candidate) {
+                        throw new Error('failed to parse candidate')
+                    }
+                    this.media.addCandidate(candidate)
+                    return
                 }
-                this.media.addCandidate(candidate)
-                return
-            }
 
-            if (event == 'offer') {
-                let offer = JSON.parse(data)
-                if (!offer) {
-                    throw new Error('failed to parse answer')
+                if (event == 'offer') {
+                    let offer = JSON.parse(data)
+                    if (!offer) {
+                        throw new Error('failed to parse answer')
+                    }
+                    this.media.setRemoteDescription(offer)
+                    const answer = await this.media.createAnswer()
+                    this.media.setLocalDescription(answer)
+
+                    this.orderWork('answer', JSON.stringify(answer))
                 }
-                this.media.setRemoteDescription(offer)
-                const answer = await this.media.createAnswer()
-                this.media.setLocalDescription(answer)
-
-                this.orderWork('answer', JSON.stringify(answer))
             }
-
             if (event === 'joined_room') {
                 const chatLog = data.chat_log
                 if (chatLog && chatLog.length) {
@@ -239,9 +241,8 @@ const component = {
                     }
                 }
 
-                this.media = await this.media.init()
+                this.media = await this.mediaObject.init()
                 if (this.media) {
-                    console.log("we somehow got here")
                     // show local video
                     this.renderer.videoArea.addVideo(this.media.stream)
                     // Add tracks to peer connection
