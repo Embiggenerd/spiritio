@@ -1,7 +1,9 @@
 # SpiritIO
 
 This is a zoom clone application that utilizes webRTC for video/audio, and
-websockets for messaging and signaling. Live at [chat.igoratakhanov.com](https://chat.igoratakhanov.com)
+websockets for messaging and signaling. Live at
+[chat.igoratakhanov.com](https://chat.igoratakhanov.com). Chrome version 1.22
+users may have problems.
 
 ## Instructions
 
@@ -14,7 +16,12 @@ $make local
 
 open localhost:8080
 
-Warning: chrome version 1.22+ has a [bug](https://github.com/pion/example-webrtc-applications/issues/168#issue-2176686827) that cuases offers to never stop sending from server. Different browsers also have different rules for access to media devices, using two different browsers is recommended, but sometimes they will fight for camera access.
+Warning: chrome version 1.22+ causes a
+[bug](https://github.com/pion/example-webrtc-applications/issues/168#issue-2176686827)
+that makes things work inconsistently. Try to use other browsers. Different
+browsers also have different rules for access to media devices, using two
+different browsers is recommended, but sometimes they will fight for camera
+access.
 
 ## Features:
 
