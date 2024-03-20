@@ -5,8 +5,8 @@ const component = {
 
     async init(render, message, media) {
         try {
+            this.media = media
             this.renderer = render()
-            this.media = await media.init()
             this.message = message.init()
             // Add user message send capability to chat input
             this.assignHandleChatInput()
@@ -16,17 +16,7 @@ const component = {
                 this.handleMessage.bind(this),
                 this.handleClose.bind(this)
             )
-            if (this.media) {
-                // show local video
-                this.renderer.videoArea.addVideo(this.media.stream)
-                // Add tracks to peer connection
-                this.media.addTrack()
-                // Tell peerConnection what to do when it recieves a candidate and track
-                this.media.assignCallbacks(
-                    this.handleOnTrack.bind(this),
-                    this.handleIceCandidate.bind(this)
-                )
-            }
+
         } catch (e) {
             this.handleError(e)
         }
@@ -247,6 +237,20 @@ const component = {
                         this.renderer.chatLog.addMessage(chatLog[i])
                         i = i + 1
                     }
+                }
+
+                this.media = await this.media.init()
+                if (this.media) {
+                    console.log("we somehow got here")
+                    // show local video
+                    this.renderer.videoArea.addVideo(this.media.stream)
+                    // Add tracks to peer connection
+                    this.media.addTrack()
+                    // Tell peerConnection what to do when it recieves a candidate and track
+                    this.media.assignCallbacks(
+                        this.handleOnTrack.bind(this),
+                        this.handleIceCandidate.bind(this)
+                    )
                 }
                 return
             }
