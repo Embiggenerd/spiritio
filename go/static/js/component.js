@@ -177,9 +177,6 @@ const component = {
     },
 
     handleOpen: function () {
-        if (this.media) {
-            this.orderMedia()
-        }
         this.renderer.chatLog.addMessage({
             text: 'able to receive messages',
             from: 'ADMIN (to you)',
@@ -252,6 +249,9 @@ const component = {
                         this.handleOnTrack.bind(this),
                         this.handleIceCandidate.bind(this)
                     )
+                    if (this.media) {
+                        this.orderMedia()
+                    }
                 }
                 return
             }
