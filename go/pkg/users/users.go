@@ -102,7 +102,6 @@ func (s *UsersService) ValidateAccessToken(tokenString string) (*jwt.Token, erro
 	}
 
 	claims := token.Claims.(*CustomClaims)
-	fmt.Println("claimzz", claims.ExpiresAt)
 	expired := claims.ExpiresAt.Time.Before(time.Now())
 
 	if !token.Valid || expired {

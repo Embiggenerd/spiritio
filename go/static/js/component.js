@@ -45,8 +45,8 @@ const component = {
                 throw new Error('chat input element not found')
             }
 
-            const up = '38'
-            const down = '40'
+            const up = 'ArrowUp'
+            const down = 'ArrowDown'
             const commandLog = this.getCommandLog()
             const lenCommands = commandLog.length - 1
             const empty = ''
@@ -174,7 +174,6 @@ const component = {
     handleMessage: async function (event) {
         try {
             const message = JSON.parse(event.data)
-            console.log('message_received', message)
             if (!message) {
                 throw new Error('failed to parse message ' + event.data)
             }
@@ -234,7 +233,6 @@ const component = {
     },
 
     orderWork: function (workOrder) {
-        console.log('workorder_sent', workOrder)
         this.messageService?.sendMessage(workOrder)
     },
 

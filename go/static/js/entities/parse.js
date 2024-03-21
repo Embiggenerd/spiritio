@@ -140,6 +140,5 @@ const parser = {
 }
 
 export default () => {
-    console.log('parser called')
     return { ...parser }
 }

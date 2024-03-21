@@ -179,12 +179,12 @@ const videoArea = {
                         nodeChildren = wrapper.children
                     }
                     const children = Array.from(nodeChildren || [])
-                    let i = 0
-                    while (i < children.length) {
-                        if (children[i].classList) {
-                            children[i].remove()
+                    children.forEach((c) => {
+                        if (c.classList.contains('text-overlay')) {
+                            c.remove()
                         }
-                    }
+                    })
+                    wrapper?.appendChild(textElement)
                 }
             }
         })
