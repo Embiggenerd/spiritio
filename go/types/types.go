@@ -4,6 +4,7 @@ type WebsocketMessage struct {
 	Type string      `json:"type,omitempty"`
 	Data interface{} `json:"data,omitempty"`
 }
+
 type Event struct {
 	Event string      `json:"event"`
 	Data  interface{} `json:"data"`

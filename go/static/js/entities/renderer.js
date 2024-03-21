@@ -1,4 +1,8 @@
+/**
+ * @type {import("../../types").ChatMessageHelper}
+ */
 const chatMessage = {
+    id: 'chatMessage',
     type: 'div',
     classList: ['chat-message'],
     create: function (text, from) {
@@ -21,6 +25,9 @@ const chatMessage = {
     },
 }
 
+/**
+ * @type {import("../../types").ChatLogHelper}
+ */
 const chatLog = {
     id: 'chat-log',
     type: 'div',
@@ -39,23 +46,42 @@ const chatLog = {
             message.from || message.user_name || message.name
         )
         const element = document.getElementById(this.id)
-        element.prepend(messageElement)
+        if (element) element.prepend(messageElement)
     },
 }
 
+/**
+ * @type {import("../../types").ChatInputHelper}
+ */
 const chatInput = {
-    zIndex: 2000,
+    classList: [],
+    zIndex: '2000',
     id: 'chat-form',
     inputID: 'message',
     templateID: 'chat-input-template',
     type: 'text-area',
     create: function () {
-        const template = document.getElementById(this.templateID)
-        const clone = template.content.firstElementChild.cloneNode(true)
-        clone.style.zIndex = this.zIndex
-        clone.setAttribute('autocomplete', 'off')
-        clone.id = this.id
-        return clone
+        let template = document.getElementById(this.templateID)
+        let assertTemplate = /** @type {HTMLTemplateElement | null} */ (
+            template
+        )
+        let clone
+        if (template && assertTemplate) {
+            if (assertTemplate.content.firstElementChild)
+                clone = assertTemplate.content.firstElementChild.cloneNode(true)
+        }
+
+        let assertCloneElement = /** @type {HTMLTemplateElement | null} */ (
+            clone
+        )
+
+        if (assertCloneElement) {
+            assertCloneElement.style.zIndex = this.zIndex
+            assertCloneElement.setAttribute('autocomplete', 'off')
+            assertCloneElement.id = this.id
+        }
+
+        return assertCloneElement
     },
     getElement() {
         return document.getElementById(this.id)
@@ -65,6 +91,9 @@ const chatInput = {
     },
 }
 
+/**
+ * @type {import("../../types").ContainerHelper}
+ */
 const container = {
     id: 'container',
     type: 'div',
@@ -79,8 +108,11 @@ const container = {
     },
 }
 
+/**
+ * @type {import("../../types").VideoAreaHelper}
+ */
 const videoArea = {
-    zIndex: 1000,
+    // zIndex: 1000,
     id: 'video-area',
     type: 'div',
     classList: ['video-area'],
@@ -90,29 +122,36 @@ const videoArea = {
             element.classList.add(c)
         })
         element.id = this.id
-        element.style.zIndex = this.zIndex
+        // element.style.zIndex = this.zIndex
         return element
     },
     addVideo: function (stream) {
         const videoWrapperElement = video.create()
 
-        const videoElement = videoWrapperElement.firstChild
-        videoElement.srcObject = stream
+        const videoElem = videoWrapperElement.firstChild
+        const assertVideoMediaElem = /** @type {HTMLMediaElement | null} */ (
+            videoElem
+        )
+        if (assertVideoMediaElem) assertVideoMediaElem.srcObject = stream
 
         const element = document.getElementById(this.id)
-        element.append(videoWrapperElement)
+        if (element) element.append(videoWrapperElement)
 
-        return videoElement
+        return assertVideoMediaElem
     },
     removeRemote: function () {
-        const children = Array.from(document.getElementById(this.id).children)
-        if (children.length > 1) {
-            let i = 1
-            while (i < children.length) {
-                if (children[i]) {
-                    children[i].remove()
-                    i++
-                }
+        const element = document.getElementById(this.id)
+        let nodeChildren
+        if (element) {
+            nodeChildren = element.children
+        }
+        const children = Array.from(nodeChildren || [])
+        const localVideoIndex = 0
+        let i = 0
+        while (i < children.length) {
+            if (i !== localVideoIndex) {
+                children[i].remove()
+                i++
             }
         }
     },
@@ -120,23 +159,33 @@ const videoArea = {
         const videoElements = Array.from(
             document.getElementsByClassName('video')
         )
-        videoElements.forEach((v) => {
-            if (v.srcObject.id === streamID) {
-                const textElement = document.createElement('div')
-                textElement.classList.add('text-overlay')
+        const assertVideoMediaElems =
+            /** @type {HTMLMediaElement[] | null[]} */ (videoElements)
+        assertVideoMediaElems.forEach((v) => {
+            if (v && v.srcObject) {
+                const assertSrcObjectMediaStream = /** @type {MediaStream} */ (
+                    v.srcObject
+                )
+                if (assertSrcObjectMediaStream.id === streamID) {
+                    const textElement = document.createElement('div')
+                    textElement.classList.add('text-overlay')
 
-                const text = document.createTextNode(name)
-                textElement.appendChild(text)
+                    const text = document.createTextNode(name)
+                    textElement.appendChild(text)
 
-                const wrapper = v.parentElement
-                // Remove existing overlay
-                Array.from(wrapper.children).forEach((c) => {
-                    if (c.classList.contains('text-overlay')) {
-                        c.remove()
+                    const wrapper = v.parentElement
+                    let nodeChildren
+                    if (wrapper) {
+                        nodeChildren = wrapper.children
                     }
-                })
-
-                wrapper.appendChild(textElement)
+                    const children = Array.from(nodeChildren || [])
+                    let i = 0
+                    while (i < children.length) {
+                        if (children[i].classList) {
+                            children[i].remove()
+                        }
+                    }
+                }
             }
         })
     },
@@ -154,35 +203,45 @@ const video = {
         wrapperElement.classList.add('video-wrapper')
 
         const element = document.createElement(this.type)
+        const assertMediaElement = /** @type {HTMLMediaElement} */ (element)
         this.classList.forEach((c) => {
-            element.classList.add(c)
+            assertMediaElement.classList.add(c)
         })
         for (const [key, val] of Object.entries(this.attributes)) {
-            element.setAttribute(key, val)
+            assertMediaElement.setAttribute(key, val)
         }
-        element.muted = true
-        wrapperElement.appendChild(element)
+        assertMediaElement.muted = true
+        wrapperElement.appendChild(assertMediaElement)
         return wrapperElement
     },
 }
+
+/**
+ * @type {import("../../types").Render}
+ */
 const render = () => {
     const root = document.getElementById(container.root)
-
+    if (!root) {
+        throw new Error('no root to latch onto')
+    }
     // Render chat area
     const containerElement = container.create()
+    if (!containerElement) {
+        throw new Error('failed to create container element')
+    }
     root.append(containerElement)
 
     // add area to contain video streams
     const videoAreaElement = videoArea.create()
-    containerElement.append(videoAreaElement)
+    if (videoAreaElement) containerElement.append(videoAreaElement)
 
     // render chat log
     const chatLogElement = chatLog.create()
-    containerElement.append(chatLogElement)
+    if (chatLogElement) containerElement.append(chatLogElement)
 
     // render chat input box
     const chatInputElement = chatInput.create()
-    containerElement.append(chatInputElement)
+    if (chatInputElement) containerElement.append(chatInputElement)
 
     return {
         chatLog,

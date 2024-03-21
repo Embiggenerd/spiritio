@@ -1,17 +1,20 @@
+/**
+ * @type {import("../types").Component}
+ */
 const component = {
     renderer: null,
-    message: null,
-    mediaObject: null,
-    media: null,
-
-    async init(render, message, media) {
+    mediaService: null,
+    messageService: null,
+    parse: null,
+    async init(render, messageService, mediaService, parse) {
         try {
-            this.mediaObject = media
+            this.mediaService = mediaService
             this.renderer = render()
-            this.message = message.init()
+            this.messageService = messageService.init()
+            this.parse = parse
             // Add user message send capability to chat input
             this.assignHandleChatInput()
-            this.message.assignCallbacks(
+            this.messageService.assignCallbacks(
                 this.handleOpen.bind(this),
                 this.handleMessageError.bind(this),
                 this.handleMessage.bind(this),
@@ -22,13 +25,13 @@ const component = {
         }
     },
 
-    assignHandleChatInput: function () {
+    assignHandleChatInput() {
         try {
-            const chatFormElement = this.renderer.chatInput.getElement()
+            const chatFormElement = this.renderer?.chatInput.getElement()
             if (chatFormElement) {
                 chatFormElement.onsubmit = this.onChatSubmit.bind(this)
                 const chatInputElement =
-                    this.renderer.chatInput.getInputElement()
+                    this.renderer?.chatInput.getInputElement()
                 this.setOnChatKeyDown(chatInputElement)
             }
         } catch (e) {
@@ -42,19 +45,23 @@ const component = {
                 throw new Error('chat input element not found')
             }
 
-            const up = 38
-            const down = 40
+            const up = '38'
+            const down = '40'
             const commandLog = this.getCommandLog()
             const lenCommands = commandLog.length - 1
             const empty = ''
             let i = -1
 
             chatInputElement.onkeydown = (event) => {
-                if (event.keyCode === up || event.keyCode === down) {
-                    if (event.keyCode === up) {
+                const target = event.target
+                const assertTargetInputElement =
+                    /** @type {HTMLInputElement | null }  */ (target)
+
+                if (event.key === up || event.key === down) {
+                    if (event.key === up) {
                         i--
                     }
-                    if (event.keyCode === down) {
+                    if (event.key === down) {
                         i++
                     }
                     if (i < -1) {
@@ -63,10 +70,12 @@ const component = {
                     if (i > lenCommands) {
                         i = -1
                     }
-                    if (i === -1) {
-                        event.target.value = empty
+                    if (i === -1 && target) {
+                        if (assertTargetInputElement)
+                            assertTargetInputElement.value = empty
                     } else {
-                        event.target.value = commandLog[i]
+                        if (assertTargetInputElement)
+                            assertTargetInputElement.value = commandLog[i]
                     }
                 }
             }
@@ -78,25 +87,39 @@ const component = {
     onChatSubmit: function (event) {
         try {
             event.preventDefault()
-            const formData = new FormData(event.target)
-            const { message } = Object.fromEntries(formData)
-            if (message.startsWith('/')) {
-                const commandConfig = this.parseUserCommand(message)
+            let formData
+            if (event.currentTarget)
+                formData = new FormData(event.currentTarget)
 
-                const work = {
-                    order: '',
-                    details: {},
+            let message
+            if (formData) {
+                message = Object.fromEntries(formData).message
+            }
+            if (typeof message === 'string' && message.startsWith('/')) {
+                let commandConfig
+                if (this.parse) {
+                    commandConfig = this.parse().parseUserCommand(message)
+
+                    /**
+                     * @type {import("../types").WorkOrder}
+                     */
+                    const work = {
+                        order: '',
+                        details: {},
+                    }
+
+                    work.order = commandConfig.workOrder
+                    commandConfig.args.forEach((a) => {
+                        work.details[a.name] = a.value
+                    })
+                    this.addToCommandLog(message)
+                    this.setOnChatKeyDown(
+                        this.renderer?.chatInput.getInputElement()
+                    )
+                    this.orderWork(work)
                 }
-
-                work.order = commandConfig.workOrder
-                commandConfig.args.forEach((a) => {
-                    work.details[a.name] = a.value
-                })
-                this.addToCommandLog(message)
-                this.setOnChatKeyDown(this.renderer.chatInput.getInputElement())
-                this.orderWork(work.order, work.details)
             } else {
-                this.orderWork('user_message', message)
+                this.orderWork({ order: 'user_message', details: message })
             }
             event.target.reset()
         } catch (e) {
@@ -104,23 +127,28 @@ const component = {
         }
     },
 
-    handleOnTrack: function (e) {
+    handleOnTrack: function (event) {
         try {
-            if (e.track.kind === 'audio') {
+            if (event.track.kind === 'audio') {
                 return
             }
-            const stream = e.streams[0]
+            const stream = event.streams[0]
             if (stream) {
-                this.orderWork('identify_streamid', stream.id)
+                this.orderWork({
+                    order: 'identify_streamid',
+                    details: stream.id,
+                })
             }
             // Add a video to the screen for every track
-            const videoElement = this.renderer.videoArea.addVideo(e.streams[0])
+            const videoElement = this.renderer?.videoArea.addVideo(
+                event.streams[0]
+            )
             // Videos are muted by default
-            e.track.onmute = function () {
+            event.track.onmute = function () {
                 videoElement.play()
             }
             // Remove the video wrapper around the video to remove text overlay
-            e.streams[0].onremovetrack = () => {
+            event.streams[0].onremovetrack = () => {
                 if (videoElement.parentNode) {
                     videoElement.parentNode.remove()
                 }
@@ -134,12 +162,19 @@ const component = {
         if (!e.candidate) {
             return
         }
-        this.orderWork('candidate', JSON.stringify(e.candidate))
+        this.orderWork({
+            order: 'candidate',
+            details: JSON.stringify(e.candidate),
+        })
     },
-
+    /**
+     * Handles all message types
+     * @param {any} event
+     */
     handleMessage: async function (event) {
         try {
             const message = JSON.parse(event.data)
+            console.log('message_received', message)
             if (!message) {
                 throw new Error('failed to parse message ' + event.data)
             }
@@ -155,7 +190,7 @@ const component = {
     },
 
     handleMessageError: function (event) {
-        this.handeError(event)
+        this.handleError(event)
     },
 
     handleError: function (error) {
@@ -164,7 +199,7 @@ const component = {
             text: error,
             from: 'ADMIN (to you)',
         }
-        if (error instanceof Event) {
+        if (error.data) {
             message.text = error.data
         }
         if (error instanceof Error) {
@@ -173,46 +208,46 @@ const component = {
         if (error.text) {
             message.text = error.text
         }
-        this.renderer.chatLog.addMessage(message)
+        this.renderer?.chatLog.addMessage(message)
     },
 
     handleOpen: function () {
-        this.renderer.chatLog.addMessage({
+        this.renderer?.chatLog.addMessage({
             text: 'able to receive messages',
             from: 'ADMIN (to you)',
         })
     },
 
     handleClose: function () {
-        this.renderer.videoArea.removeRemote()
-        this.renderer.chatLog.addMessage({
+        this.renderer?.videoArea.removeRemote()
+        this.renderer?.chatLog.addMessage({
             text: 'unable to receive messages',
             from: 'ADMIN (to you)',
         })
     },
 
     orderMedia: function () {
-        this.orderWork('media_request', this.media.constraints)
+        this.orderWork({
+            order: 'media_request',
+            details: this.mediaService?.constraints,
+        })
     },
 
-    orderWork: function (order, details) {
-        const message = {
-            order,
-            details,
-        }
-        this.message.sendMessage(message)
+    orderWork: function (workOrder) {
+        console.log('workorder_sent', workOrder)
+        this.messageService?.sendMessage(workOrder)
     },
 
     handleEvent: async function (event, data) {
         try {
             // Server will send offers regardless if we ask
-            if (this.media) {
+            if (this.mediaService?.permissionsGranted) {
                 if (event == 'candidate') {
                     let candidate = JSON.parse(data)
                     if (!candidate) {
                         throw new Error('failed to parse candidate')
                     }
-                    this.media.addCandidate(candidate)
+                    this.mediaService.addCandidate(candidate)
                     return
                 }
 
@@ -221,11 +256,14 @@ const component = {
                     if (!offer) {
                         throw new Error('failed to parse answer')
                     }
-                    this.media.setRemoteDescription(offer)
-                    const answer = await this.media.createAnswer()
-                    this.media.setLocalDescription(answer)
+                    this.mediaService.setRemoteDescription(offer)
+                    const answer = await this.mediaService.createAnswer()
+                    this.mediaService.setLocalDescription(answer)
 
-                    this.orderWork('answer', JSON.stringify(answer))
+                    this.orderWork({
+                        order: 'answer',
+                        details: JSON.stringify(answer),
+                    })
                 }
             }
             if (event === 'joined_room') {
@@ -233,38 +271,41 @@ const component = {
                 if (chatLog && chatLog.length) {
                     let i = 0
                     while (i < chatLog.length) {
-                        this.renderer.chatLog.addMessage(chatLog[i])
+                        this.renderer?.chatLog.addMessage(chatLog[i])
                         i = i + 1
                     }
                 }
-
-                this.media = await this.mediaObject.init()
-                if (this.media) {
-                    // show local video
-                    this.renderer.videoArea.addVideo(this.media.stream)
-                    // Add tracks to peer connection
-                    this.media.addTrack()
-                    // Tell peerConnection what to do when it recieves a candidate and track
-                    this.media.assignCallbacks(
-                        this.handleOnTrack.bind(this),
-                        this.handleIceCandidate.bind(this)
-                    )
-                    if (this.media) {
-                        this.orderMedia()
+                if (this.mediaService) {
+                    this.mediaService = await this.mediaService.init()
+                    if (this.mediaService?.permissionsGranted) {
+                        // show local video
+                        this.renderer?.videoArea.addVideo(
+                            this.mediaService.stream
+                        )
+                        // Add tracks to peer connection
+                        this.mediaService.addTrack()
+                        // Tell peerConnection what to do when it recieves a candidate and track
+                        this.mediaService.assignCallbacks(
+                            this.handleOnTrack.bind(this),
+                            this.handleIceCandidate.bind(this)
+                        )
+                        if (this.mediaService.permissionsGranted) {
+                            this.orderMedia()
+                        }
                     }
+                    return
                 }
-                return
             }
 
             if (event === 'created_room') {
                 const urlParams = new URLSearchParams(window.location.search)
                 urlParams.set('room', data)
-                window.location.search = urlParams
+                window.location.search = urlParams.toString()
                 return
             }
 
             if (event === 'user_message') {
-                this.renderer.chatLog.addMessage(data)
+                this.renderer?.chatLog.addMessage(data)
                 return
             }
 
@@ -274,11 +315,11 @@ const component = {
                     from: `ADMIN (to you)`,
                     text: `logged in as ${data.name}`,
                 }
-                this.renderer.chatLog.addMessage(message)
+                this.renderer?.chatLog.addMessage(message)
             }
 
             if (event === 'user_name_change') {
-                this.renderer.chatLog.addMessage({
+                this.renderer?.chatLog.addMessage({
                     from: 'ADMIN (to you): ',
                     text: `Name changed to ${data}`,
                 })
@@ -292,7 +333,7 @@ const component = {
             }
 
             if (event === 'streamid_user_name') {
-                this.renderer.videoArea.identifyStream(
+                this.renderer?.videoArea.identifyStream(
                     data.stream_id,
                     data.name
                 )
@@ -304,7 +345,7 @@ const component = {
                     text,
                     from: 'ADMIN',
                 }
-                this.renderer.chatLog.addMessage(message)
+                this.renderer?.chatLog.addMessage(message)
             }
         } catch (e) {
             this.handleError(e)
@@ -314,7 +355,10 @@ const component = {
     handleQuestion: function (ask) {
         if (ask === 'access_token') {
             const accessToken = localStorage.getItem('access_token')
-            this.orderWork('validate_access_token', accessToken || '')
+            this.orderWork({
+                order: 'validate_access_token',
+                details: accessToken || '',
+            })
             return
         }
 
@@ -324,139 +368,8 @@ const component = {
                 text,
                 from: 'ADMIN (to you)',
             }
-            this.renderer.chatLog.addMessage(message)
+            this.renderer?.chatLog.addMessage(message)
             return
-        }
-    },
-
-    // Parses a user message starting with '/' into a work order
-    parseUserCommand: function (command) {
-        let workOrderKey = ''
-        const commandConfig = {
-            'set password': {
-                workOrder: 'set_user_password',
-                args: [
-                    {
-                        name: 'password',
-                        regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
-                        value: '',
-                    },
-                ],
-            },
-            'set name': {
-                workOrder: 'set_user_name',
-                args: [
-                    {
-                        name: 'name',
-                        regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
-                        value: '',
-                    },
-                ],
-            },
-            login: {
-                workOrder: 'validate_user_name_password',
-                args: [
-                    // order of these matters
-                    {
-                        name: 'name',
-                        regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
-                        value: '',
-                    },
-                    {
-                        name: 'password',
-                        regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
-                        value: '',
-                    },
-                ],
-            },
-        }
-        const commandChar = '/'
-        const allLettersRegex = /[a-zA-Z]/
-        let i = 0
-
-        parse()
-        let argsCount = 0
-        let argsRequired = 0
-
-        commandConfig[workOrderKey].args.forEach((a) => {
-            if (a.value) {
-                argsCount++
-            }
-            argsRequired++
-        })
-        if (argsCount !== argsRequired) {
-            throw new Error(
-                `wrong argument number: have ${argsCount}, want ${argsRequired}`
-            )
-        }
-        return commandConfig[workOrderKey]
-
-        function parse() {
-            if (match(commandChar)) {
-                eat(commandChar)
-            }
-            parseCommand(readWhileMatching(allLettersRegex))
-            skipWhitespace()
-            parseArguments()
-        }
-        // Find any words that are in the list of possible commands
-        function parseCommand(word) {
-            workOrderKey = workOrderKey + ' ' + word
-            workOrderKey = workOrderKey.trim()
-            if (
-                Object.keys(commandConfig).includes(
-                    workOrderKey.toLowerCase()
-                ) ||
-                i === command.length
-            ) {
-                return
-            }
-            skipWhitespace()
-            parseCommand(readWhileMatching(allLettersRegex))
-        }
-        // Figure out the arguments according to config
-        function parseArguments() {
-            if (!commandConfig.hasOwnProperty(workOrderKey)) {
-                throw new Error('no such command')
-            }
-            const args = commandConfig[workOrderKey].args
-            let j = 0
-            if (args) {
-                while (j < args.length) {
-                    skipWhitespace()
-                    args[j].value = readWhileMatching(args[j].regex)
-                    j++
-                }
-            }
-            skipWhitespace()
-            const next = i + 1
-            if (command[next]) {
-                throw new Error('Too many arguments')
-            }
-        }
-
-        function eat(str) {
-            if (match(str)) {
-                i += str.length
-            } else {
-                throw new Error(`Parse error: expecting "${str}"`)
-            }
-        }
-
-        function match(str) {
-            return command.slice(i, i + str.length) === str
-        }
-
-        function readWhileMatching(regex) {
-            let startIndex = i
-            while (i < command.length && regex.test(command[i])) {
-                i++
-            }
-            return command.slice(startIndex, i)
-        }
-
-        function skipWhitespace() {
-            readWhileMatching(/[\s\n]/)
         }
     },
 
@@ -472,3 +385,10 @@ const component = {
 }
 
 export default component
+
+const hey =
+    "Type '{ init(render: Render, messageService: MessageService, mediaService: MediaService, parse: () => Parser): Promise<void>; ... 15 more ...; "
+const ghi =
+    "addToCommandLog: (command: string) => void; }' is missing the following properties from type 'Component': renderer, mediaService, messageService, parse, parseUserCommand"
+
+;("Type '{ renderer: null; init(render: Render, messageService: MessageService, mediaService: MediaService, parse: () => Parser): Promise<void>; ... 15 more ...; addToCommandLog: (command: string) => void; }' is missing the following properties from type 'Component': mediaService, messageService, parse")

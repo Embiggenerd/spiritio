@@ -1,4 +1,7 @@
-const message = {
+/**
+ * @type {import("../../types").MessageService}
+ */
+const messageService = {
     path: '/ws',
     scheme: window.location.protocol == 'https:' ? 'wss' : 'ws',
     conn: null,
@@ -31,4 +34,4 @@ const message = {
     },
 }
 
-export default message
+export default messageService
