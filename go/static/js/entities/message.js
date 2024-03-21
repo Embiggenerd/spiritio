@@ -2,10 +2,12 @@
  * @type {import("../../types").MessageService}
  */
 const messageService = {
+    webSocket: null,
     path: '/ws',
     scheme: window.location.protocol == 'https:' ? 'wss' : 'ws',
     conn: null,
-    init: function () {
+    init: function (wsClass) {
+        this.webSocket = wsClass || WebSocket
         this.conn = this.connect()
         return this
     },
@@ -19,7 +21,7 @@ const messageService = {
             window.location.host +
             this.path +
             window.location.search
-        return new WebSocket(url)
+        return new this.webSocket(url)
     },
     assignCallbacks: function (
         handleOpen,

@@ -1,3 +1,5 @@
+import parser from './utils/parser.js'
+
 /**
  * @type {import("../types").Component}
  */
@@ -5,13 +7,11 @@ const component = {
     renderer: null,
     mediaService: null,
     messageService: null,
-    parse: null,
-    async init(render, messageService, mediaService, parse) {
+    async init(render, messageService, mediaService) {
         try {
             this.mediaService = mediaService
             this.renderer = render()
-            this.messageService = messageService.init()
-            this.parse = parse
+            this.messageService = messageService.init(WebSocket)
             // Add user message send capability to chat input
             this.assignHandleChatInput()
             this.messageService.assignCallbacks(
@@ -97,27 +97,25 @@ const component = {
             }
             if (typeof message === 'string' && message.startsWith('/')) {
                 let commandConfig
-                if (this.parse) {
-                    commandConfig = this.parse().parseUserCommand(message)
+                commandConfig = parser().parseUserCommand(message)
 
-                    /**
-                     * @type {import("../types").WorkOrder}
-                     */
-                    const work = {
-                        order: '',
-                        details: {},
-                    }
-
-                    work.order = commandConfig.workOrder
-                    commandConfig.args.forEach((a) => {
-                        work.details[a.name] = a.value
-                    })
-                    this.addToCommandLog(message)
-                    this.setOnChatKeyDown(
-                        this.renderer?.chatInput.getInputElement()
-                    )
-                    this.orderWork(work)
+                /**
+                 * @type {import("../types").WorkOrder}
+                 */
+                const work = {
+                    order: '',
+                    details: {},
                 }
+
+                work.order = commandConfig.workOrder
+                commandConfig.args.forEach((a) => {
+                    work.details[a.name] = a.value
+                })
+                this.addToCommandLog(message)
+                this.setOnChatKeyDown(
+                    this.renderer?.chatInput.getInputElement()
+                )
+                this.orderWork(work)
             } else {
                 this.orderWork({ order: 'user_message', details: message })
             }
@@ -383,10 +381,3 @@ const component = {
 }
 
 export default component
-
-const hey =
-    "Type '{ init(render: Render, messageService: MessageService, mediaService: MediaService, parse: () => Parser): Promise<void>; ... 15 more ...; "
-const ghi =
-    "addToCommandLog: (command: string) => void; }' is missing the following properties from type 'Component': renderer, mediaService, messageService, parse, parseUserCommand"
-
-;("Type '{ renderer: null; init(render: Render, messageService: MessageService, mediaService: MediaService, parse: () => Parser): Promise<void>; ... 15 more ...; addToCommandLog: (command: string) => void; }' is missing the following properties from type 'Component': mediaService, messageService, parse")

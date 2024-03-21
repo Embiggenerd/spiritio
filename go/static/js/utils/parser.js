@@ -89,8 +89,25 @@ const parser = {
         }
         this.skipWhitespace()
         this.parseCommand(this.readWhileMatching(this.allLettersRegex))
-
-        // Figure out the arguments according to config
+    },
+    parseArguments: function () {
+        if (!this.commandConfigs.hasOwnProperty(this.workOrderKey)) {
+            throw new Error('no such command')
+        }
+        const args = this.commandConfigs[this.workOrderKey].args
+        let j = 0
+        if (args) {
+            while (j < args.length) {
+                this.skipWhitespace()
+                args[j].value = this.readWhileMatching(args[j].regex)
+                j++
+            }
+        }
+        this.skipWhitespace()
+        const next = this.i + 1
+        if (this.command[next]) {
+            throw new Error('Too many arguments')
+        }
     },
     readWhileMatching: function (regex) {
         let startIndex = this.i
@@ -118,27 +135,6 @@ const parser = {
     skipWhitespace: function () {
         this.readWhileMatching(/[\s\n]/)
     },
-    parseArguments: function () {
-        if (!this.commandConfigs.hasOwnProperty(this.workOrderKey)) {
-            throw new Error('no such command')
-        }
-        const args = this.commandConfigs[this.workOrderKey].args
-        let j = 0
-        if (args) {
-            while (j < args.length) {
-                this.skipWhitespace()
-                args[j].value = this.readWhileMatching(args[j].regex)
-                j++
-            }
-        }
-        this.skipWhitespace()
-        const next = this.i + 1
-        if (this.command[next]) {
-            throw new Error('Too many arguments')
-        }
-    },
 }
 
-export default () => {
-    return { ...parser }
-}
+export default () => ({ ...parser })

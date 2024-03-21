@@ -13,7 +13,8 @@ export type Question = {
 }
 
 type MessageService = {
-    init: () => MessageService
+    init: (wsClass: any) => MessageService
+    webSocket: any
     path: string
     scheme: string
     conn: any
@@ -95,13 +96,11 @@ export type Component = {
     init: (
         render: Render,
         messageService: MessageService,
-        mediaService: MediaService,
-        parse: () => Parser
+        mediaService: MediaService
     ) => void
     renderer: Renderer | null
     mediaService: MediaService | null
     messageService: MessageService | null
-    parse: null | (() => Parser)
     assignHandleChatInput: () => void
     handleOpen: () => void
     handleClose: () => void
