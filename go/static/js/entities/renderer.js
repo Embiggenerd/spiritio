@@ -146,10 +146,9 @@ const videoArea = {
             nodeChildren = element.children
         }
         const children = Array.from(nodeChildren || [])
-        const localVideoIndex = 0
-        let i = 0
+        let i = 1
         while (i < children.length) {
-            if (i !== localVideoIndex) {
+            if (children[i]) {
                 children[i].remove()
                 i++
             }

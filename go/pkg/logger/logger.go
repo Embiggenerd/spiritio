@@ -77,7 +77,7 @@ type CustomLogger struct {
 
 // Fatal logs a message and exits
 func (l *CustomLogger) Fatal(msg string) {
-	l.Log(context.TODO(), logFatal, "msg")
+	l.Log(context.TODO(), logFatal, msg)
 	os.Exit(1)
 }
 
