@@ -140,6 +140,7 @@ export type Parser = {
     commandConfigs: CommandConfigs
     commandChar: string
     allLettersRegex: RegExp
+    alphaNumericSpecialRegex: RegExp
     parseUserCommand: (command: string) => CommandConfig
     parse: () => void
     match: (str: string) => boolean
@@ -147,7 +148,7 @@ export type Parser = {
     readWhileMatching: (regex: RegExp) => string
     skipWhitespace: () => void
     parseCommand: (word: string) => void
-    parseArguments: () => void
+    parseArguments: (arg: string, count: number) => number
 }
 
 // export type CommandConfigs = Record<Student['id'], Student>

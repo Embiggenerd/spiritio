@@ -1,6 +1,6 @@
 *.pyc
 node_modules
-*.log
 *.db
 /go/bin/*
 nohup.out
+*.log
