@@ -7,33 +7,35 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/joho/godotenv v1.5.1
+	github.com/pion/webrtc/v4 v4.0.0-beta.13
 	github.com/samber/slog-multi v1.0.2
 	github.com/urfave/negroni v1.0.0
-	golang.org/x/crypto v0.14.0
+	golang.org/x/crypto v0.18.0
 	golang.org/x/text v0.14.0
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
-	github.com/pion/dtls/v2 v2.2.7 // indirect
-	github.com/pion/ice/v2 v2.3.11 // indirect
+	github.com/pion/dtls/v2 v2.2.10 // indirect
+	github.com/pion/ice/v3 v3.0.3 // indirect
 	github.com/pion/interceptor v0.1.25 // indirect
 	github.com/pion/logging v0.2.2 // indirect
-	github.com/pion/mdns v0.0.8 // indirect
+	github.com/pion/mdns v0.0.12 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtp v1.8.3 // indirect
-	github.com/pion/sctp v1.8.8 // indirect
-	github.com/pion/sdp/v3 v3.0.6 // indirect
-	github.com/pion/srtp/v2 v2.0.18 // indirect
-	github.com/pion/stun v0.6.1 // indirect
-	github.com/pion/transport/v2 v2.2.3 // indirect
-	github.com/pion/turn/v2 v2.1.3 // indirect
+	github.com/pion/sctp v1.8.12 // indirect
+	github.com/pion/sdp/v3 v3.0.8 // indirect
+	github.com/pion/srtp/v3 v3.0.1 // indirect
+	github.com/pion/stun/v2 v2.0.0 // indirect
+	github.com/pion/transport/v2 v2.2.4 // indirect
+	github.com/pion/transport/v3 v3.0.1 // indirect
+	github.com/pion/turn/v3 v3.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/samber/lo v1.38.1 // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
+	github.com/stretchr/testify v1.9.0 // indirect
 	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/sys v0.16.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
@@ -42,8 +44,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/mattn/go-sqlite3 v1.14.19 // indirect
 	github.com/pion/rtcp v1.2.13
-	github.com/pion/webrtc/v3 v3.2.24
-	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/net v0.20.0 // indirect
 	gorm.io/driver/sqlite v1.5.4
 	gorm.io/gorm v1.25.5
 )

@@ -70,12 +70,20 @@ const component = {
                     if (i > lenCommands) {
                         i = -1
                     }
-                    if (i === -1 && target) {
+                    if (i === -1) {
                         if (assertTargetInputElement)
                             assertTargetInputElement.value = empty
                     } else {
-                        if (assertTargetInputElement)
+                        if (assertTargetInputElement) {
                             assertTargetInputElement.value = commandLog[i]
+                            // some browers focus before moving the cursor
+                            setTimeout(() => {
+                                assertTargetInputElement.selectionStart =
+                                    assertTargetInputElement.value.length
+                                assertTargetInputElement.selectionEnd =
+                                    assertTargetInputElement.value.length
+                            }, 0)
+                        }
                     }
                 }
             }
@@ -169,14 +177,15 @@ const component = {
      * Handles all message types
      * @param {any} event
      */
-    handleMessage: async function (event) {
+    handleMessage: function (event) {
         try {
             const message = JSON.parse(event.data)
+            console.log({ message })
             if (!message) {
                 throw new Error('failed to parse message ' + event.data)
             }
             if (message.type == 'event') {
-                await this.handleEvent(message.data.event, message.data.data)
+                this.handleEvent(message.data.event, message.data.data)
             }
             if (message.type == 'question') {
                 this.handleQuestion(message.data.ask)
@@ -231,6 +240,7 @@ const component = {
     },
 
     orderWork: function (workOrder) {
+        console.log(workOrder)
         this.messageService?.sendMessage(workOrder)
     },
 

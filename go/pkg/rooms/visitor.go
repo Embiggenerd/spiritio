@@ -5,7 +5,7 @@ import (
 	"github.com/Embiggenerd/spiritio/pkg/utils"
 	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
 	"github.com/Embiggenerd/spiritio/types"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 	"gorm.io/gorm"
 )
 

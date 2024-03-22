@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"unicode"
 
 	"github.com/Embiggenerd/spiritio/pkg/config"
 	"github.com/Embiggenerd/spiritio/pkg/logger"
@@ -17,7 +18,7 @@ import (
 	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
 	"github.com/Embiggenerd/spiritio/types"
 
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 type APIServer struct {
@@ -311,6 +312,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			if err := peerConnection.SetRemoteDescription(answer); err != nil {
 				s.handleError(ctx, "internal server error", http.StatusInternalServerError, err, visitor)
 			}
+
 		case "user_message":
 			// Send message to each client subbed to this peer's peerConnections
 			data := types.UserMessageData{
@@ -330,15 +332,20 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				s.log.Error(err.Error())
 			}
+
 		case "set_user_password":
 			password := workOrder.Details.(map[string]interface{})["password"]
-
-			if password != "" {
-				err = s.userService.UpdateUserPassword(visitor.User.ID, password.(string))
-				if err != nil {
-					s.handleError(ctx, "", http.StatusInternalServerError, err, visitor)
-				}
+			valid := validateUserPassword(password.(string))
+			if !valid {
+				s.handleError(ctx, "password must be at least 8 characters long, and contain a number, letter, and special character", http.StatusBadRequest, err, visitor)
+				break
 			}
+
+			err = s.userService.UpdateUserPassword(visitor.User.ID, password.(string))
+			if err != nil {
+				s.handleError(ctx, "", http.StatusInternalServerError, err, visitor)
+			}
+
 			name := s.userService.EnsureUnique(visitor.User.Name, visitor.User.ID)
 			s.userService.UpdateUserName(visitor.User.ID, name)
 
@@ -412,6 +419,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 				Data:  data,
 			}
 			visitor.Room.BroadcastEvent(event)
+
 		case "validate_user_name_password":
 			password := workOrder.Details.(map[string]interface{})["password"]
 			name := workOrder.Details.(map[string]interface{})["name"]
@@ -446,6 +454,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 				}
 				visitor.Room.BroadcastEvent(event)
 			}
+
 		case "identify_streamid":
 			name := ""
 			for _, v := range visitor.Room.Visitors {
@@ -493,4 +502,28 @@ func (s *APIServer) handleError(ctx context.Context, message string, statusCode 
 	if visitor != nil {
 		visitor.Notify(event)
 	}
+}
+
+func validateUserPassword(password string) bool {
+	var (
+		hasCorrectLen = false
+		hasLetter     = false
+		hasNumber     = false
+		hasSpecial    = false
+	)
+	if len(password) >= 8 {
+		hasCorrectLen = true
+	}
+	for _, char := range password {
+		switch {
+		case unicode.IsLetter(char):
+			hasLetter = true
+		case unicode.IsNumber(char):
+			hasNumber = true
+		case unicode.IsPunct(char) || unicode.IsSymbol(char):
+			hasSpecial = true
+		}
+	}
+	return hasCorrectLen && hasLetter && hasNumber && hasSpecial
+
 }
