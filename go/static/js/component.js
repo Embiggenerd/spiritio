@@ -78,10 +78,7 @@ const component = {
                             assertTargetInputElement.value = commandLog[i]
                             // some browers focus before moving the cursor
                             setTimeout(() => {
-                                assertTargetInputElement.selectionStart =
-                                    assertTargetInputElement.value.length
-                                assertTargetInputElement.selectionEnd =
-                                    assertTargetInputElement.value.length
+                                assertTargetInputElement.setSelectionRange(assertTargetInputElement.value.length, assertTargetInputElement.value.length)
                             }, 0)
                         }
                     }
