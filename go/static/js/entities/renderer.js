@@ -144,7 +144,6 @@ const chatInput = {
         while (i < elems.length) {
             const e = elems[i]
             if (e instanceof HTMLElement) {
-                console.log('e', e, e.dataset.name, e.dataset.id)
                 namesToIDs.push({
                     name: e.dataset.name || '',
                     id: e.dataset.id || '',
@@ -271,7 +270,6 @@ const videoArea = {
         }
     },
     identifyStream: function (streamID, name) {
-        console.log({ streamID, name })
         const videoElements = Array.from(
             document.getElementsByClassName('video')
         )
@@ -280,7 +278,6 @@ const videoArea = {
             const textElement = this.createTextOverlay(name)
 
             const wrapper = videoElements[0].parentElement
-            console.log({ wrapper })
             wrapper?.appendChild(textElement)
         }
 

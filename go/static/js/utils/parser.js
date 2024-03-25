@@ -7,83 +7,29 @@ const parser = {
     command: '',
     i: 0,
     workOrderKey: '',
-    commandConfigs: {
-        'set password': {
-            workOrder: 'set_user_password',
-            args: [
-                {
-                    name: 'password',
-                    regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
-                    value: '',
-                },
-            ],
-        },
-        'set name': {
-            workOrder: 'set_user_name',
-            args: [
-                {
-                    name: 'name',
-                    regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
-                    value: '',
-                },
-            ],
-        },
-        login: {
-            workOrder: 'validate_user_name_password',
-            args: [
-                // order of these matters
-                {
-                    name: 'name',
-                    regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
-                    value: '',
-                },
-                {
-                    name: 'password',
-                    regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
-                    value: '',
-                },
-            ],
-        },
-        'direct message': {
-            workOrder: 'user_message',
-            args: [
-                {
-                    name: 'toUserID',
-                    regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
-                    value: 0,
-                },
-                {
-                    name: 'text',
-                    regex: /[.]/,
-                    value: '',
-                },
-            ],
-        },
-    },
+    commandConfigs: {},
     commandChar: '/',
     directMessageChar: '@',
     allLettersRegex: /[a-zA-Z]/,
     alphaNumericSpecialRegex: /[A-Za-z0-9_@./#&+!$_*+-]/,
 
-    parseUserCommand: function (command, namesToIDs) {
+    parseUserCommand: function (command, namesToIDs, commandConfigs) {
         this.command = command
         this.namesToIDs = namesToIDs
+        this.commandConfigs = commandConfigs
         this.parse()
-        this.parseDirectMessage()
-        // let argsCount = 0
-        // let argsRequired = 0
-
-        // this.commandConfigs[this.workOrderKey].args.forEach((a) => {
-        //     if (a.value) {
-        //         argsCount++
-        //     }
-        //     argsRequired++
-        // })
+        // this.parseDirectMessage()
 
         return this.commandConfigs[this.workOrderKey]
     },
 
     parse: function () {
+        if (this.match(this.directMessageChar)) {
+            this.eat(this.directMessageChar)
+            this.parseDirectMessage()
+            return
+        }
+
         if (this.match(this.commandChar)) {
             this.eat(this.commandChar)
         } else {
@@ -145,12 +91,8 @@ const parser = {
     },
 
     parseDirectMessage() {
-        if (this.match(this.directMessageChar)) {
-            this.eat(this.directMessageChar)
-        }
         this.workOrderKey = 'direct message'
         const name = this.readWhileMatching(this.alphaNumericSpecialRegex)
-        console.log({ name }, this.namesToIDs)
         let userID = ''
         let i = 0
         while (i < this.namesToIDs.length) {
@@ -164,7 +106,6 @@ const parser = {
         this.commandConfigs[this.workOrderKey].args[0].value = Number(userID)
         this.skipWhitespace()
         const text = this.readWhileMatching(/./)
-        console.log({ text })
         this.commandConfigs[this.workOrderKey].args[1].value = text.trimEnd()
     },
 

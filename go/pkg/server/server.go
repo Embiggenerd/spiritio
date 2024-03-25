@@ -87,25 +87,15 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 		for i, v := range room.Visitors {
 			if visitor.SocketID == v.SocketID {
 				room.Visitors = append(room.Visitors[:i], room.Visitors[i+1:]...)
-				fmt.Println("*removing visitor", v.User.Name, v.User.ID, v.StreamID)
 				break
 			}
 		}
 
-		present := false
-		for _, v := range visitor.Room.Visitors {
-			if v.User.ID == visitor.User.ID {
-				present = true
-			}
-		}
-
-		if !present {
-			if visitor.User != nil {
-				event := &types.Event{Event: "user_exited_chat", Data: types.UserExitedChatData{
-					Name: visitor.User.Name, ID: visitor.User.ID,
-				}}
-				visitor.Room.BroadcastEvent(event)
-			}
+		if visitor.User != nil {
+			event := &types.Event{Event: "user_exited_chat", Data: types.UserExitedChatData{
+				Name: visitor.User.Name, ID: visitor.User.ID,
+			}}
+			visitor.Room.BroadcastEvent(event)
 		}
 		return closeHandler(code, text)
 	})
@@ -169,13 +159,9 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 		chats = append(chats, chat)
 	}
 
-	fmt.Println("***", utils.PrintableStruct(room.Visitors))
-
 	visitors := []types.Visitor{}
 	for _, v := range room.Visitors {
-		fmt.Println("&&&", utils.PrintableStruct(v.User))
 		utils.PrintStruct(v)
-		// fmt.Println("room.Visitors.userv*", v.User, v.User.ID, v.User.Name)
 		if v.User != nil {
 			visitors = append(visitors, types.Visitor{ID: v.User.ID, Name: v.User.Name})
 		}
@@ -306,20 +292,11 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 					// below code is untested and seems to be broken
 					user, accessToken, err := s.userService.CreateUser(false)
 
-					present := false
-					for _, v := range visitor.Room.Visitors {
-						if v.User.ID == user.ID {
-							present = true
-						}
+					event := &types.Event{
+						Event: "user_entered_chat",
+						Data:  user.Name,
 					}
-
-					if !present {
-						event := &types.Event{
-							Event: "user_entered_chat",
-							Data:  user.Name,
-						}
-						visitor.Room.BroadcastEvent(event)
-					}
+					visitor.Room.BroadcastEvent(event)
 
 					visitor.AddUser(user)
 					if err != nil {
@@ -342,23 +319,11 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 					visitor.Clarify("credentials")
 				}
 
-				present := false
-				for _, v := range visitor.Room.Visitors {
-					if v.User != nil {
-
-						if v.User.ID == user.ID {
-							present = true
-						}
-					}
+				event := &types.Event{
+					Event: "user_entered_chat",
+					Data:  user.Name,
 				}
-
-				if !present {
-					event := &types.Event{
-						Event: "user_entered_chat",
-						Data:  user.Name,
-					}
-					visitor.Room.BroadcastEvent(event)
-				}
+				visitor.Room.BroadcastEvent(event)
 
 				visitor.User = user
 
@@ -398,12 +363,9 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			}
 
 		case "user_message":
-			fmt.Println("visitor count", len(visitor.Room.Visitors))
-			fmt.Println("peerConnections count", visitor.Room.SFU.CountPeerConnections())
 			wo := &types.UserMessageWorkOrder{}
 			err = json.Unmarshal(raw, wo)
 			if err != nil {
-				fmt.Println("detailsBytes error", err)
 				break
 			}
 
@@ -421,7 +383,6 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			}
 
 			isDirectMessage := data.ToUserID != 0
-			fmt.Println("^*", isDirectMessage, wo)
 			if isDirectMessage {
 				for _, v := range visitor.Room.Visitors {
 					if v.User.ID == data.ToUserID {
@@ -569,9 +530,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			deduped := utils.RemoveDuplicate(guests)
-			fmt.Println("sending*", guests, deduped)
 			visitor.Notify(&types.Event{Event: "current_guests", Data: deduped})
-
 		}
 
 	}

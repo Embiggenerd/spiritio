@@ -128,6 +128,7 @@ export type Component = {
     handleMessageError: (event: any) => void
     orderMedia: () => void
     handleOnTrack: (event: any) => void
+    handleInput: (event: any) => void
 }
 
 export type CommandConfig = {
@@ -156,7 +157,8 @@ export type Parser = {
     namesToIDs: namesToID[]
     parseUserCommand: (
         command: string,
-        namesToIDs: namesToID[]
+        namesToIDs: namesToID[],
+        commandConfigs: CommandConfigs
     ) => CommandConfig
     parse: () => void
     match: (str: string) => boolean

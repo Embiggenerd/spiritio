@@ -1,4 +1,5 @@
 import parser from './utils/parser.js'
+import commandConfigs from './config/commandConfig.js'
 
 /**
  * @type {import("../types").Component}
@@ -32,10 +33,22 @@ const component = {
                 chatFormElement.onsubmit = this.onChatSubmit.bind(this)
                 const chatInputElement =
                     this.renderer?.chatInput.getInputElement()
-                if (chatInputElement) this.setOnChatKeyDown(chatInputElement)
+                if (chatInputElement) {
+                    this.setOnChatKeyDown(chatInputElement)
+                    chatInputElement.oninput = this.handleInput.bind(this)
+                }
             }
         } catch (e) {
             this.handleError(e)
+        }
+    },
+
+    handleInput: function (event) {
+        const value = event.target.value
+        if (value[0] == '@' || value[0] == '/') {
+            this.renderer?.chatInput.showTooltip()
+        } else {
+            this.renderer?.chatInput.hideTooltip()
         }
     },
 
@@ -111,7 +124,8 @@ const component = {
 
                 const commandConfig = parser().parseUserCommand(
                     message,
-                    namesToIDs || []
+                    namesToIDs || [],
+                    commandConfigs
                 )
 
                 /**
@@ -186,7 +200,6 @@ const component = {
     handleMessage: function (event) {
         try {
             const message = JSON.parse(event.data)
-            // console.log({ message })
             if (!message) {
                 throw new Error('failed to parse message ' + event.data)
             }
@@ -206,7 +219,6 @@ const component = {
     },
 
     handleError: function (error) {
-        console.error(error)
         const message = {
             text: error,
             from_user_name: 'ADMIN (to you)',
@@ -326,6 +338,11 @@ const component = {
             if (event === 'user_message') {
                 const assertUserMessage =
                     /** @type {import("../types").UserMessageData} */ (data)
+
+                if (data.to_user_id) {
+                    assertUserMessage.from_user_name =
+                        data.from_user_name + ' (to you)'
+                }
                 this.renderer?.chatLog.addMessage(assertUserMessage)
             }
 
@@ -385,7 +402,6 @@ const component = {
             }
 
             if (event === 'current_guests') {
-                console.log('*** got guests', data)
                 this.renderer?.chatInput.setTooltipContent(data)
             }
         } catch (e) {
