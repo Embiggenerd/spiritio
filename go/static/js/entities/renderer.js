@@ -43,7 +43,7 @@ const chatLog = {
     addMessage: function (message) {
         const messageElement = chatMessage.create(
             message.text,
-            message.from || message.user_name || message.name
+            message.from_user_name
         )
         const element = document.getElementById(this.id)
         if (element) element.prepend(messageElement)
@@ -59,6 +59,8 @@ const chatInput = {
     id: 'chat-form',
     inputID: 'message',
     templateID: 'chat-input-template',
+    tooltipID: 'tooltip',
+    tooltipNameClass: 'tooltip-name',
     type: 'text-area',
     create: function () {
         let template = document.getElementById(this.templateID)
@@ -87,7 +89,122 @@ const chatInput = {
         return document.getElementById(this.id)
     },
     getInputElement() {
-        return document.getElementById(this.inputID)
+        const elem = document.getElementById(this.inputID)
+        return /** @type {HTMLInputElement} */ (elem)
+    },
+    getTooltip() {
+        return document.getElementById(this.tooltipID)
+    },
+    hideTooltip() {
+        const tooltip = this.getTooltip()
+        if (tooltip) tooltip.classList.add('hidden')
+    },
+    showTooltip() {
+        const tooltip = this.getTooltip()
+        if (tooltip) tooltip.classList.remove('hidden')
+    },
+    setTooltipContent(userArray) {
+        let i = 0
+        const tooltip = this.getTooltip()
+        if (tooltip) tooltip.innerHTML = ''
+
+        while (i < userArray.length && tooltip) {
+            const str = `@${userArray[i].name}`
+
+            const text = document.createTextNode(str)
+            const elem = document.createElement('div')
+            elem.classList.add(this.tooltipNameClass)
+
+            // storing for later use
+            elem.dataset.name = userArray[i].name
+            elem.dataset.id = userArray[i].id.toString()
+
+            elem.appendChild(text)
+
+            elem.addEventListener('click', () => {
+                const input = this.getInputElement()
+                input.value = str
+                input.focus()
+                setTimeout(() => {
+                    input.setSelectionRange(
+                        input.value.length,
+                        input.value.length
+                    )
+                }, 0)
+            })
+
+            tooltip.appendChild(elem)
+            i++
+        }
+    },
+    getNamesToIDs() {
+        const elems = document.getElementsByClassName(this.tooltipNameClass)
+        let i = 0
+        const namesToIDs = []
+        while (i < elems.length) {
+            const e = elems[i]
+            if (e instanceof HTMLElement) {
+                console.log('e', e, e.dataset.name, e.dataset.id)
+                namesToIDs.push({
+                    name: e.dataset.name || '',
+                    id: e.dataset.id || '',
+                })
+            }
+            i++
+        }
+        return namesToIDs
+    },
+    appendTooltipContent({ name, id }) {
+        const currentNames = document.getElementsByClassName(
+            this.tooltipNameClass
+        )
+        let i = 0
+        // If name already exists im tooltip, do not append
+        while (i < currentNames.length) {
+            const assertHTMLElem = /** @type {HTMLElement} */ (currentNames[i])
+            if (assertHTMLElem.dataset.id === id) return
+            i++
+        }
+
+        const tooltip = this.getTooltip()
+
+        const str = `@${name}`
+
+        const text = document.createTextNode(str)
+        const elem = document.createElement('div')
+        elem.classList.add(this.tooltipNameClass)
+
+        // storing for later use
+        elem.dataset.name = name
+        elem.dataset.id = id.toString()
+
+        elem.appendChild(text)
+
+        elem.addEventListener('click', () => {
+            const input = this.getInputElement()
+            input.value = str
+            input.focus()
+            setTimeout(() => {
+                input.setSelectionRange(input.value.length, input.value.length)
+            }, 0)
+        })
+
+        tooltip?.appendChild(elem)
+    },
+
+    removeTooltipContent(id) {
+        const currentNames = document.getElementsByClassName(
+            this.tooltipNameClass
+        )
+
+        let i = 0
+        while (i < currentNames.length) {
+            const assertHTMLElem = /** @type {HTMLElement} */ (currentNames[i])
+            if (assertHTMLElem.dataset.id === id) {
+                assertHTMLElem.remove()
+            }
+            i++
+        }
     },
 }
 
@@ -122,7 +239,6 @@ const videoArea = {
             element.classList.add(c)
         })
         element.id = this.id
-        // element.style.zIndex = this.zIndex
         return element
     },
     addVideo: function (stream) {
@@ -155,9 +271,19 @@ const videoArea = {
         }
     },
     identifyStream: function (streamID, name) {
+        console.log({ streamID, name })
         const videoElements = Array.from(
             document.getElementsByClassName('video')
         )
+
+        if (streamID === '') {
+            const textElement = this.createTextOverlay(name)
+
+            const wrapper = videoElements[0].parentElement
+            console.log({ wrapper })
+            wrapper?.appendChild(textElement)
+        }
+
         const assertVideoMediaElems =
             /** @type {HTMLMediaElement[] | null[]} */ (videoElements)
         assertVideoMediaElems.forEach((v) => {
@@ -166,27 +292,35 @@ const videoArea = {
                     v.srcObject
                 )
                 if (assertSrcObjectMediaStream.id === streamID) {
-                    const textElement = document.createElement('div')
-                    textElement.classList.add('text-overlay')
-
-                    const text = document.createTextNode(name)
-                    textElement.appendChild(text)
+                    const textElement = this.createTextOverlay(name)
 
                     const wrapper = v.parentElement
                     let nodeChildren
+
                     if (wrapper) {
                         nodeChildren = wrapper.children
                     }
+
                     const children = Array.from(nodeChildren || [])
                     children.forEach((c) => {
                         if (c.classList.contains('text-overlay')) {
                             c.remove()
                         }
                     })
+
                     wrapper?.appendChild(textElement)
                 }
             }
         })
+    },
+
+    createTextOverlay: function (name) {
+        const textElement = document.createElement('div')
+        textElement.classList.add('text-overlay')
+
+        const textNode = document.createTextNode(name)
+        textElement.appendChild(textNode)
+        return textElement
     },
 }
 

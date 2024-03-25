@@ -3,6 +3,7 @@
  * @type {import("../../types").Parser}
  */
 const parser = {
+    namesToIDs: [],
     command: '',
     i: 0,
     workOrderKey: '',
@@ -43,23 +44,41 @@ const parser = {
                 },
             ],
         },
+        'direct message': {
+            workOrder: 'user_message',
+            args: [
+                {
+                    name: 'toUserID',
+                    regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
+                    value: 0,
+                },
+                {
+                    name: 'text',
+                    regex: /[.]/,
+                    value: '',
+                },
+            ],
+        },
     },
     commandChar: '/',
+    directMessageChar: '@',
     allLettersRegex: /[a-zA-Z]/,
     alphaNumericSpecialRegex: /[A-Za-z0-9_@./#&+!$_*+-]/,
 
-    parseUserCommand: function (command) {
+    parseUserCommand: function (command, namesToIDs) {
         this.command = command
+        this.namesToIDs = namesToIDs
         this.parse()
-        let argsCount = 0
-        let argsRequired = 0
+        this.parseDirectMessage()
+        // let argsCount = 0
+        // let argsRequired = 0
 
-        this.commandConfigs[this.workOrderKey].args.forEach((a) => {
-            if (a.value) {
-                argsCount++
-            }
-            argsRequired++
-        })
+        // this.commandConfigs[this.workOrderKey].args.forEach((a) => {
+        //     if (a.value) {
+        //         argsCount++
+        //     }
+        //     argsRequired++
+        // })
 
         return this.commandConfigs[this.workOrderKey]
     },
@@ -67,6 +86,8 @@ const parser = {
     parse: function () {
         if (this.match(this.commandChar)) {
             this.eat(this.commandChar)
+        } else {
+            return
         }
 
         this.parseCommand(this.readWhileMatching(this.allLettersRegex))
@@ -123,6 +144,30 @@ const parser = {
         )
     },
 
+    parseDirectMessage() {
+        if (this.match(this.directMessageChar)) {
+            this.eat(this.directMessageChar)
+        }
+        this.workOrderKey = 'direct message'
+        const name = this.readWhileMatching(this.alphaNumericSpecialRegex)
+        console.log({ name }, this.namesToIDs)
+        let userID = ''
+        let i = 0
+        while (i < this.namesToIDs.length) {
+            if (this.namesToIDs[i].name === name) {
+                userID = this.namesToIDs[i].id
+                break
+            }
+            i++
+        }
+
+        this.commandConfigs[this.workOrderKey].args[0].value = Number(userID)
+        this.skipWhitespace()
+        const text = this.readWhileMatching(/./)
+        console.log({ text })
+        this.commandConfigs[this.workOrderKey].args[1].value = text.trimEnd()
+    },
+
     readWhileMatching: function (regex) {
         let startIndex = this.i
         while (
@@ -130,6 +175,7 @@ const parser = {
             regex.test(this.command[this.i])
         ) {
             this.i++
+            if (this.i - startIndex > 255) break
         }
         return this.command.slice(startIndex, this.i)
     },

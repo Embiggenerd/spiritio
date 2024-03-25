@@ -11,7 +11,7 @@ const component = {
         try {
             this.mediaService = mediaService
             this.renderer = render()
-            this.messageService = messageService.init(WebSocket)
+            this.messageService = messageService.init()
             // Add user message send capability to chat input
             this.assignHandleChatInput()
             this.messageService.assignCallbacks(
@@ -32,7 +32,7 @@ const component = {
                 chatFormElement.onsubmit = this.onChatSubmit.bind(this)
                 const chatInputElement =
                     this.renderer?.chatInput.getInputElement()
-                this.setOnChatKeyDown(chatInputElement)
+                if (chatInputElement) this.setOnChatKeyDown(chatInputElement)
             }
         } catch (e) {
             this.handleError(e)
@@ -78,7 +78,10 @@ const component = {
                             assertTargetInputElement.value = commandLog[i]
                             // some browers focus before moving the cursor
                             setTimeout(() => {
-                                assertTargetInputElement.setSelectionRange(assertTargetInputElement.value.length, assertTargetInputElement.value.length)
+                                assertTargetInputElement.setSelectionRange(
+                                    assertTargetInputElement.value.length,
+                                    assertTargetInputElement.value.length
+                                )
                             }, 0)
                         }
                     }
@@ -100,9 +103,16 @@ const component = {
             if (formData) {
                 message = Object.fromEntries(formData).message
             }
-            if (typeof message === 'string' && message.startsWith('/')) {
-                let commandConfig
-                commandConfig = parser().parseUserCommand(message)
+            if (
+                typeof message === 'string' &&
+                (message.startsWith('@') || message.startsWith('/'))
+            ) {
+                const namesToIDs = this.renderer?.chatInput.getNamesToIDs()
+
+                const commandConfig = parser().parseUserCommand(
+                    message,
+                    namesToIDs || []
+                )
 
                 /**
                  * @type {import("../types").WorkOrder}
@@ -117,12 +127,16 @@ const component = {
                     work.details[a.name] = a.value
                 })
                 this.addToCommandLog(message)
-                this.setOnChatKeyDown(
-                    this.renderer?.chatInput.getInputElement()
-                )
+
+                const inputElem = this.renderer?.chatInput?.getInputElement()
+                if (inputElem) this.setOnChatKeyDown(inputElem)
+
                 this.orderWork(work)
             } else {
-                this.orderWork({ order: 'user_message', details: message })
+                this.orderWork({
+                    order: 'user_message',
+                    details: { text: message },
+                })
             }
             event.target.reset()
         } catch (e) {
@@ -148,13 +162,11 @@ const component = {
             )
             // Videos are muted by default
             event.track.onmute = function () {
-                videoElement.play()
+                videoElement?.play()
             }
             // Remove the video wrapper around the video to remove text overlay
             event.streams[0].onremovetrack = () => {
-                if (videoElement.parentNode) {
-                    videoElement.parentNode.remove()
-                }
+                videoElement?.parentElement?.remove()
             }
         } catch (e) {
             this.handleError(e)
@@ -170,14 +182,11 @@ const component = {
             details: JSON.stringify(e.candidate),
         })
     },
-    /**
-     * Handles all message types
-     * @param {any} event
-     */
+
     handleMessage: function (event) {
         try {
             const message = JSON.parse(event.data)
-            console.log({ message })
+            // console.log({ message })
             if (!message) {
                 throw new Error('failed to parse message ' + event.data)
             }
@@ -200,7 +209,7 @@ const component = {
         console.error(error)
         const message = {
             text: error,
-            from: 'ADMIN (to you)',
+            from_user_name: 'ADMIN (to you)',
         }
         if (error.data) {
             message.text = error.data
@@ -217,7 +226,7 @@ const component = {
     handleOpen: function () {
         this.renderer?.chatLog.addMessage({
             text: 'able to receive messages',
-            from: 'ADMIN (to you)',
+            from_user_name: 'ADMIN (to you)',
         })
     },
 
@@ -225,7 +234,7 @@ const component = {
         this.renderer?.videoArea.removeRemote()
         this.renderer?.chatLog.addMessage({
             text: 'unable to receive messages',
-            from: 'ADMIN (to you)',
+            from_user_name: 'ADMIN (to you)',
         })
     },
 
@@ -242,6 +251,7 @@ const component = {
     },
 
     handleEvent: async function (event, data) {
+        console.log({ event, data })
         try {
             // Server will send offers regardless if we ask
             if (this.mediaService?.permissionsGranted) {
@@ -251,7 +261,6 @@ const component = {
                         throw new Error('failed to parse candidate')
                     }
                     this.mediaService.addCandidate(candidate)
-                    return
                 }
 
                 if (event == 'offer') {
@@ -278,25 +287,33 @@ const component = {
                         i = i + 1
                     }
                 }
+
+                this.orderWork({ order: 'get_current_guests' })
+                // this.renderer?.chatInput.setTooltipContent(data.visitors || [])
                 if (this.mediaService) {
                     this.mediaService = await this.mediaService.init()
-                    if (this.mediaService?.permissionsGranted) {
+                    if (
+                        this.mediaService?.permissionsGranted &&
+                        this.mediaService.stream
+                    ) {
                         // show local video
                         this.renderer?.videoArea.addVideo(
                             this.mediaService.stream
                         )
+
                         // Add tracks to peer connection
                         this.mediaService.addTrack()
+
                         // Tell peerConnection what to do when it recieves a candidate and track
                         this.mediaService.assignCallbacks(
                             this.handleOnTrack.bind(this),
                             this.handleIceCandidate.bind(this)
                         )
+
                         if (this.mediaService.permissionsGranted) {
                             this.orderMedia()
                         }
                     }
-                    return
                 }
             }
 
@@ -304,18 +321,19 @@ const component = {
                 const urlParams = new URLSearchParams(window.location.search)
                 urlParams.set('room', data)
                 window.location.search = urlParams.toString()
-                return
             }
 
             if (event === 'user_message') {
-                this.renderer?.chatLog.addMessage(data)
-                return
+                const assertUserMessage =
+                    /** @type {import("../types").UserMessageData} */ (data)
+                this.renderer?.chatLog.addMessage(assertUserMessage)
             }
 
             if (event === 'user_logged_in') {
                 localStorage.setItem('access_token', data.access_token)
+
                 const message = {
-                    from: `ADMIN (to you)`,
+                    from_user_name: `ADMIN (to you)`,
                     text: `logged in as ${data.name}`,
                 }
                 this.renderer?.chatLog.addMessage(message)
@@ -323,7 +341,7 @@ const component = {
 
             if (event === 'user_name_change') {
                 this.renderer?.chatLog.addMessage({
-                    from: 'ADMIN (to you): ',
+                    from_user_name: 'ADMIN (to you): ',
                     text: `Name changed to ${data}`,
                 })
             }
@@ -336,19 +354,39 @@ const component = {
             }
 
             if (event === 'streamid_user_name') {
-                this.renderer?.videoArea.identifyStream(
-                    data.stream_id,
-                    data.name
-                )
+                if (data.name) {
+                    this.renderer?.videoArea.identifyStream(
+                        data.stream_id,
+                        data.name
+                    )
+                }
             }
 
-            if (event === 'user_joined_chat') {
+            if (event === 'user_entered_chat') {
                 const text = `${data} has joined the chat`
                 const message = {
                     text,
-                    from: 'ADMIN',
+                    from_user_name: 'ADMIN',
                 }
                 this.renderer?.chatLog.addMessage(message)
+
+                this.orderWork({ order: 'get_current_guests' })
+            }
+
+            if (event === 'user_exited_chat') {
+                const text = `${data.name} has exited the chat`
+                const message = {
+                    text,
+                    from_user_name: 'ADMIN',
+                }
+                this.renderer?.chatLog.addMessage(message)
+
+                this.orderWork({ order: 'get_current_guests' })
+            }
+
+            if (event === 'current_guests') {
+                console.log('*** got guests', data)
+                this.renderer?.chatInput.setTooltipContent(data)
             }
         } catch (e) {
             this.handleError(e)
@@ -366,10 +404,10 @@ const component = {
         }
 
         if (ask === 'credentials') {
-            const text = `We have created a new, unverified account for you. If you would like to add a password, type "/set password <password>", and you can change your name. If you would like to log into a different account, type "/login <name> <password>".`
+            const text = `We have created a new, unprotected account for you. If you would like to add a password, type "/set password <password>", and you can change your name. If you would like to log into a different account, type "/login <name> <password>".`
             const message = {
                 text,
-                from: 'ADMIN (to you)',
+                from_user_name: 'ADMIN (to you)',
             }
             this.renderer?.chatLog.addMessage(message)
             return

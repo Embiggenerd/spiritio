@@ -1,15 +1,12 @@
 package rooms
 
 import (
+	"github.com/Embiggenerd/spiritio/types"
 	"gorm.io/gorm"
 )
 
 type ChatRoomLog struct {
 	gorm.Model
-	Text         string
-	RoomID       uint
-	Room         *ChatRoom `gorm:"foreignKey:RoomID"`
-	UserID       uint
-	UserName     string
-	UserVerified int `gorm:"default:0"`
+	types.UserMessageData
+	RoomID uint
 }

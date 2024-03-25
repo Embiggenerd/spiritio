@@ -9,6 +9,7 @@ import (
 	"github.com/Embiggenerd/spiritio/pkg/utils"
 	"github.com/Embiggenerd/spiritio/pkg/websocketClient"
 	"github.com/Embiggenerd/spiritio/types"
+	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -53,7 +54,7 @@ func (r *ChatRoom) BroadcastEvent(event *types.Event) {
 }
 
 func (r *ChatRoom) AddVisitor(visitor *Visitor) {
-
+	visitor.SocketID = r.untilUnique(uuid.NewString())
 	r.Visitors = append(r.Visitors, visitor)
 }
 
@@ -61,19 +62,22 @@ func (r *ChatRoom) CreateUniqueDisplayName() string {
 	return r.untilUnique(utils.RandName())
 }
 
-func (r *ChatRoom) untilUnique(name string) string {
+func (r *ChatRoom) untilUnique(id string) string {
 	unique := true
-	for _, v := range r.Visitors {
-		if v.User != nil {
-			if name == v.User.Name {
-				unique = false
-				break
+	if r.Visitors != nil {
+
+		for _, v := range r.Visitors {
+			if v.User != nil {
+				if id == v.SocketID {
+					unique = false
+					break
+				}
 			}
 		}
-	}
 
-	if name == "" || !unique {
-		return r.untilUnique(utils.RandName())
 	}
-	return name
+	if id == "" || !unique {
+		return r.untilUnique(uuid.NewString())
+	}
+	return id
 }

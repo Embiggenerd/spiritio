@@ -80,6 +80,36 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 	// visitor will be used throughout to gain access to user info and write to connection
 	visitor := rooms.NewVisitor(wsClient, nil, room)
 
+	closeHandler := wsClient.Conn.CloseHandler()
+	wsClient.Conn.SetCloseHandler(func(code int, text string) error {
+
+		// Remove visitor from room on websocket close message
+		for i, v := range room.Visitors {
+			if visitor.SocketID == v.SocketID {
+				room.Visitors = append(room.Visitors[:i], room.Visitors[i+1:]...)
+				fmt.Println("*removing visitor", v.User.Name, v.User.ID, v.StreamID)
+				break
+			}
+		}
+
+		present := false
+		for _, v := range visitor.Room.Visitors {
+			if v.User.ID == visitor.User.ID {
+				present = true
+			}
+		}
+
+		if !present {
+			if visitor.User != nil {
+				event := &types.Event{Event: "user_exited_chat", Data: types.UserExitedChatData{
+					Name: visitor.User.Name, ID: visitor.User.ID,
+				}}
+				visitor.Room.BroadcastEvent(event)
+			}
+		}
+		return closeHandler(code, text)
+	})
+
 	if roomIDStr == "" {
 		// If the user does not have roomID in search params, create new room
 		room, err = s.roomsService.CreateRoom(ctx)
@@ -127,29 +157,38 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	room.AddVisitor(visitor)
 	visitor.Room = room
+	room.AddVisitor(visitor)
 
 	event := &types.Event{}
 	event.Event = "joined_room"
 	// create chat events from room's chatlog cache
 	var chats []types.UserMessageData
 	for i := 0; i < len(room.ChatLog); i++ {
-		chat := types.UserMessageData{}
-		chat.Text = room.ChatLog[i].Text
-		chat.UserID = room.ChatLog[i].UserID
-		chat.UserName = room.ChatLog[i].UserName
-		chat.UserVerified = room.ChatLog[i].UserVerified != 0
+		chat := room.ChatLog[i].UserMessageData
 		chats = append(chats, chat)
 	}
-	event.Data = types.JoinedRoomData{
-		ChatLog: chats,
-		RoomID:  room.ID,
+
+	fmt.Println("***", utils.PrintableStruct(room.Visitors))
+
+	visitors := []types.Visitor{}
+	for _, v := range room.Visitors {
+		fmt.Println("&&&", utils.PrintableStruct(v.User))
+		utils.PrintStruct(v)
+		// fmt.Println("room.Visitors.userv*", v.User, v.User.ID, v.User.Name)
+		if v.User != nil {
+			visitors = append(visitors, types.Visitor{ID: v.User.ID, Name: v.User.Name})
+		}
 	}
 
+	event.Data = types.JoinedRoomData{
+		ChatLog:  chats,
+		RoomID:   room.ID,
+		Visitors: visitors,
+	}
 	visitor.Notify(event)
 
-	// Ask for authentication
+	// ask for authentication
 	visitor.Clarify("access_token")
 
 	var peerConnection *webrtc.PeerConnection
@@ -201,9 +240,9 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 					if err := peerConnection.Close(); err != nil {
 						s.log.Error(err.Error())
 					}
+
 				case webrtc.PeerConnectionStateClosed:
 					room.SFU.SignalPeerConnections()
-				default:
 				}
 			})
 
@@ -227,19 +266,18 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			})
+
 			room.SFU.SignalPeerConnections()
 
 		case "validate_access_token":
 			token, err := s.userService.ValidateAccessToken(workOrder.Details.(string))
 			if err != nil {
 				user, accessToken, err := s.userService.CreateUser(false)
-				visitor.AddUser(user)
 				if err != nil {
 					s.handleError(ctx, "internal server error", http.StatusInternalServerError, err, visitor)
-					return
+					break
 				}
-
-				visitor.CreateUniqueDisplayName()
+				visitor.AddUser(user)
 
 				data := types.UserLoggedInData{
 					Name:        user.Name,
@@ -256,7 +294,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 				visitor.Clarify("credentials")
 
 				event = &types.Event{
-					Event: "user_joined_chat",
+					Event: "user_entered_chat",
 					Data:  user.Name,
 				}
 				visitor.Room.BroadcastEvent(event)
@@ -265,30 +303,76 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 				user, err := s.userService.GetUserFromAccessToken(token)
 				if err != nil {
 					s.handleError(ctx, "failed parsing user token", http.StatusInternalServerError, err, visitor)
-					return
+					// below code is untested and seems to be broken
+					user, accessToken, err := s.userService.CreateUser(false)
+
+					present := false
+					for _, v := range visitor.Room.Visitors {
+						if v.User.ID == user.ID {
+							present = true
+						}
+					}
+
+					if !present {
+						event := &types.Event{
+							Event: "user_entered_chat",
+							Data:  user.Name,
+						}
+						visitor.Room.BroadcastEvent(event)
+					}
+
+					visitor.AddUser(user)
+					if err != nil {
+						s.handleError(ctx, "internal server error", http.StatusInternalServerError, err, visitor)
+						return
+					}
+
+					data := types.UserLoggedInData{
+						Name:        user.Name,
+						ID:          user.ID,
+						AccessToken: accessToken,
+					}
+
+					event = &types.Event{
+						Event: "user_logged_in",
+						Data:  data,
+					}
+
+					visitor.Notify(event)
+					visitor.Clarify("credentials")
+				}
+
+				present := false
+				for _, v := range visitor.Room.Visitors {
+					if v.User != nil {
+
+						if v.User.ID == user.ID {
+							present = true
+						}
+					}
+				}
+
+				if !present {
+					event := &types.Event{
+						Event: "user_entered_chat",
+						Data:  user.Name,
+					}
+					visitor.Room.BroadcastEvent(event)
 				}
 
 				visitor.User = user
-				if user.Name == "" {
-					visitor.User.Name = room.CreateUniqueDisplayName()
-				}
 
 				data := types.UserLoggedInData{
 					Name:        user.Name,
 					ID:          user.ID,
 					AccessToken: workOrder.Details.(string),
 				}
-				event := &types.Event{
+				event = &types.Event{
 					Event: "user_logged_in",
 					Data:  data,
 				}
 				visitor.Notify(event)
 
-				event = &types.Event{
-					Event: "user_joined_chat",
-					Data:  user.Name,
-				}
-				visitor.Room.BroadcastEvent(event)
 			}
 
 		case "candidate":
@@ -314,21 +398,42 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			}
 
 		case "user_message":
-			// Send message to each client subbed to this peer's peerConnections
+			fmt.Println("visitor count", len(visitor.Room.Visitors))
+			fmt.Println("peerConnections count", visitor.Room.SFU.CountPeerConnections())
+			wo := &types.UserMessageWorkOrder{}
+			err = json.Unmarshal(raw, wo)
+			if err != nil {
+				fmt.Println("detailsBytes error", err)
+				break
+			}
+
 			data := types.UserMessageData{
-				Text:         workOrder.Details.(string),
-				UserName:     visitor.User.Name,
+				Text:         wo.Details.Text,
+				ToUserID:     wo.Details.ToUserID,
+				FromUserName: visitor.User.Name,
 				UserVerified: visitor.User.Verified != 0,
-				UserID:       visitor.User.ID,
+				FromUserID:   visitor.User.ID,
 			}
 
 			event := &types.Event{
 				Event: "user_message",
 				Data:  data,
 			}
-			room.BroadcastEvent(event)
+
+			isDirectMessage := data.ToUserID != 0
+			fmt.Println("^*", isDirectMessage, wo)
+			if isDirectMessage {
+				for _, v := range visitor.Room.Visitors {
+					if v.User.ID == data.ToUserID {
+						v.Notify(event)
+					}
+				}
+			} else {
+				room.BroadcastEvent(event)
+			}
+
 			// Write new chatlog to DB with this room's ID as foreign key
-			err := s.roomsService.SaveChatLog(workOrder.Details.(string), room, visitor.User)
+			err := s.roomsService.SaveChatLog(data, visitor)
 			if err != nil {
 				s.log.Error(err.Error())
 			}
@@ -346,34 +451,11 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 				s.handleError(ctx, "", http.StatusInternalServerError, err, visitor)
 			}
 
-			name := s.userService.EnsureUnique(visitor.User.Name, visitor.User.ID)
-			s.userService.UpdateUserName(visitor.User.ID, name)
-
-			if name != visitor.User.Name {
-				visitor.User.Name = name
-				event := &types.Event{
-					Event: "user_name_change",
-					Data:  name,
-				}
-				visitor.Notify(event)
-
-				data := &types.StreamIDUserNameData{
-					StreamID: visitor.StreamID,
-					Name:     name,
-				}
-
-				event = &types.Event{
-					Event: "streamid_user_name",
-					Data:  data,
-				}
-				visitor.Room.BroadcastEvent(event)
-			}
-
 			data := types.UserMessageData{
 				Text:         "Password changed",
-				UserName:     "ADMIN (to you)",
+				FromUserName: "ADMIN (to you)",
 				UserVerified: false,
-				UserID:       0,
+				FromUserID:   0,
 			}
 
 			event := &types.Event{
@@ -449,30 +531,47 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 				visitor.Notify(event)
 
 				event = &types.Event{
-					Event: "user_joined_chat",
+					Event: "user_entered_chat",
 					Data:  user.Name,
 				}
 				visitor.Room.BroadcastEvent(event)
 			}
 
 		case "identify_streamid":
-			name := ""
+			// name := ""
 			for _, v := range visitor.Room.Visitors {
 				if v.StreamID == workOrder.Details.(string) {
-					name = v.User.Name
+					// name = v.User.Name
+					data := &types.StreamIDUserNameData{
+						StreamID: workOrder.Details.(string),
+						Name:     v.User.Name,
+					}
+
+					event := &types.Event{
+						Event: "streamid_user_name",
+						Data:  data,
+					}
+					visitor.Room.BroadcastEvent(event)
 					break
 				}
 			}
-			data := &types.StreamIDUserNameData{
-				StreamID: workOrder.Details.(string),
-				Name:     name,
-			}
 
-			event := &types.Event{
-				Event: "streamid_user_name",
-				Data:  data,
+		case "get_current_guests":
+			guests := types.CurrentGuestsData{}
+			// idMap := make(map[uint]bool)
+			// Remove duplicates and own visitor
+			for _, v := range visitor.Room.Visitors {
+				if v.User != nil && visitor.User != nil && visitor.User.ID != v.User.ID {
+					guests = append(guests, types.CurrentGuest{
+						Name: v.User.Name, ID: v.User.ID,
+					})
+
+				}
 			}
-			visitor.Room.BroadcastEvent(event)
+			deduped := utils.RemoveDuplicate(guests)
+			fmt.Println("sending*", guests, deduped)
+			visitor.Notify(&types.Event{Event: "current_guests", Data: deduped})
+
 		}
 
 	}

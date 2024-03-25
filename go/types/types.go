@@ -19,17 +19,16 @@ type WorkOrder struct {
 	Details interface{}
 }
 
-type UserMessageData struct {
-	Text         string `json:"text,omitempty"`
-	UserName     string `json:"user_name,omitempty"`
-	UserID       uint   `json:"user_id,omitempty"`
-	UserVerified bool   `json:"user_verified"`
+type JoinedRoomData struct {
+	RoomID   uint              `json:"room_id,omitempty"`
+	ChatLog  []UserMessageData `json:"chat_log"`
+	Name     string            `json:"name,omitempty"`
+	Visitors []Visitor         `json:"visitors"`
 }
 
-type JoinedRoomData struct {
-	RoomID  uint              `json:"room_id,omitempty"`
-	ChatLog []UserMessageData `json:"chat_log"`
-	Name    string            `json:"name,omitempty"`
+type Visitor struct {
+	ID   uint   `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
 type ErrorData struct {
@@ -48,3 +47,39 @@ type StreamIDUserNameData struct {
 	StreamID string `json:"stream_id,omitempty"`
 	Name     string `json:"name,omitempty"`
 }
+
+type DirectMessageData struct {
+	Text       string
+	ToUserID   uint
+	FromUserID uint
+}
+
+type UserMessageData struct {
+	Text         string `json:"text,omitempty"`
+	FromUserName string `json:"from_user_name,omitempty"`
+	FromUserID   uint   `json:"from_user_id,omitempty"`
+	UserVerified bool   `json:"user_verified"`
+	ToUserID     uint   `json:"to_user_id,omitempty"`
+}
+
+type UserMessageWorkOrderDetail struct {
+	Text     string
+	ToUserID uint
+}
+
+type UserMessageWorkOrder struct {
+	Order   string
+	Details UserMessageWorkOrderDetail
+}
+
+type UserExitedChatData struct {
+	Name string `json:"name,omitempty"`
+	ID   uint   `json:"id,omitempty"`
+}
+
+type CurrentGuest struct {
+	Name string `json:"name,omitempty"`
+	ID   uint   `json:"id,omitempty"`
+}
+
+type CurrentGuestsData []CurrentGuest

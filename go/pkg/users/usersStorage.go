@@ -1,7 +1,11 @@
 package users
 
 import (
+	"errors"
+
 	"github.com/Embiggenerd/spiritio/pkg/db"
+	"github.com/Embiggenerd/spiritio/pkg/utils"
+	"gorm.io/gorm"
 )
 
 type UsersStore interface {
@@ -19,6 +23,7 @@ type UsersStorage struct {
 func (s *UsersStorage) getUserByID(userID uint) (*User, error) {
 	foundUser := &User{}
 	userResult := s.db.DB.Where(User{ID: userID}).First(foundUser)
+
 	return foundUser, userResult.Error
 }
 
@@ -28,8 +33,11 @@ func (u *UsersStorage) CreateUser(admin bool) (*User, error) {
 		i = 1
 	}
 
+	name := u.EnsureUniqueName(utils.RandName(), 0)
+
 	newUser := &User{
 		Admin: i,
+		Name:  name,
 	}
 
 	userResult := u.db.DB.Create(newUser)
@@ -39,6 +47,15 @@ func (u *UsersStorage) CreateUser(admin bool) (*User, error) {
 func (u *UsersStorage) UpdateUserName(id uint, name string) error {
 	result := u.db.DB.Model(&User{ID: id}).Updates(User{Name: name})
 	return result.Error
+}
+
+func (u *UsersStorage) EnsureUniqueName(name string, id uint) string {
+	user, err := u.getUserByName(name)
+	if errors.Is(err, gorm.ErrRecordNotFound) || user.ID == id {
+		return name
+	}
+
+	return u.EnsureUniqueName(utils.RandName(), id)
 }
 
 func (u *UsersStorage) getUserByName(name string) (*User, error) {

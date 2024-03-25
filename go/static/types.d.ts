@@ -13,7 +13,7 @@ export type Question = {
 }
 
 type MessageService = {
-    init: (wsClass: any) => MessageService
+    init: (wsClass?: any) => MessageService
     webSocket: any
     path: string
     scheme: string
@@ -51,9 +51,9 @@ type MediaService = {
 type Render = () => Renderer
 
 type Renderer = {
-    chatLog: any
-    videoArea: any
-    chatInput: any
+    chatLog: ChatLogHelper
+    videoArea: VideoAreaHelper
+    chatInput: ChatInputHelper
 }
 
 type ChatMessageHelper = ElementHelper & {
@@ -67,16 +67,26 @@ export type ChatLogHelper = ElementHelper & {
     type: string
     classList: string[]
     create: () => HTMLElement
-    addMessage: (message: any) => void
+    addMessage: (message: { text: string; from_user_name: string }) => void
 }
 
 export type ChatInputHelper = ElementHelper & {
     zIndex: string
     inputID: string
     templateID: string
+    tooltipID: string
+    tooltipNameClass: string
     getElement: () => HTMLElement | null
-    getInputElement: () => HTMLElement | null
+    getInputElement: () => HTMLInputElement
+    setTooltipContent: (namesToIDs: namesToID[]) => void
+    appendTooltipContent: (nameToId: namesToID) => void
+    removeTooltipContent: (id: string) => void
+    getTooltip: () => HTMLElement | null
+    hideTooltip: () => void
+    showTooltip: () => void
+    getNamesToIDs: () => namesToID[]
 }
+type namesToID = { name: string; id: string }
 
 export type ContainerHelper = ElementHelper & {
     root: string
@@ -86,6 +96,7 @@ export type VideoAreaHelper = ElementHelper & {
     addVideo: (stream: MediaStream) => HTMLMediaElement | null
     removeRemote: () => void
     identifyStream: (streamID: string, name: string) => void
+    createTextOverlay: (text: string) => HTMLElement
 }
 
 export type VideoHelper = ElementHelper & {
@@ -126,7 +137,7 @@ export type CommandConfig = {
 
 export type WorkOrder = {
     order: string
-    details: any
+    details?: any
 }
 
 export interface CommandConfigs {
@@ -139,9 +150,14 @@ export type Parser = {
     workOrderKey: string
     commandConfigs: CommandConfigs
     commandChar: string
+    directMessageChar: string
     allLettersRegex: RegExp
     alphaNumericSpecialRegex: RegExp
-    parseUserCommand: (command: string) => CommandConfig
+    namesToIDs: namesToID[]
+    parseUserCommand: (
+        command: string,
+        namesToIDs: namesToID[]
+    ) => CommandConfig
     parse: () => void
     match: (str: string) => boolean
     eat: (str: string) => void
@@ -149,14 +165,13 @@ export type Parser = {
     skipWhitespace: () => void
     parseCommand: (word: string) => void
     parseArguments: (arg: string, count: number) => number
+    parseDirectMessage: () => void
 }
-
-// export type CommandConfigs = Record<Student['id'], Student>
 
 type commandArgument = {
     name: string
     regex: RegExp
-    value: string
+    value: string | number
 }
 
 type ElementHelper = {
@@ -164,4 +179,17 @@ type ElementHelper = {
     type: string
     classList: string[]
     create: () => HTMLElement | null
+}
+
+type UserMessageData = {
+    text: string
+    from_user_name: string
+    from_user_id: number
+    user_verified: boolean
+    to_user_id: number
+}
+
+type UserMessageWorkDetails = {
+    text: string
+    to_user_id: number | null
 }

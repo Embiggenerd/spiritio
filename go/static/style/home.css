@@ -16,7 +16,6 @@ body {
     display: flex;
     flex-direction: column;
     background: #fffcf5;
-
 }
 
 .video-area {
@@ -67,10 +66,10 @@ body {
     padding: 3px;
 }
 
-.chat-message>span {
+.chat-message > span {
     margin: 0;
     word-break: break-all;
-    color: #756753;
+    color: #5e5140;
 }
 
 .bold {
@@ -79,7 +78,22 @@ body {
 
 #chat-form {
     padding: 10px;
-    background: #FFF8E8;
+    background: #fff8e8;
+    position: relative;
+}
+
+.tooltip {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    z-index: 5000;
+    background-color: white;
+    border: 2px solid red;
+    top: -300px;
+}
+
+.hidden {
+    display: none;
 }
 
 .chat-input {

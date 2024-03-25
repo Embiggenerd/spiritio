@@ -10,6 +10,7 @@ import (
 )
 
 func NewVisitor(client *websocketClient.WebsocketClient, user *users.User, room *ChatRoom) *Visitor {
+
 	newVisitor := &Visitor{
 		User:   user,
 		Client: client,
@@ -27,6 +28,7 @@ type Visitor struct {
 	Client         *websocketClient.WebsocketClient `gorm:"-:all"`
 	PeerConnection *webrtc.PeerConnection           `gorm:"-:all"`
 	StreamID       string                           `gorm:"-:all"`
+	SocketID       string                           `gorm:"-:all"`
 }
 
 func (v *Visitor) AddUser(user *users.User) {
