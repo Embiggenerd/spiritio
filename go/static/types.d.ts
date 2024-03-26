@@ -78,14 +78,22 @@ export type ChatInputHelper = ElementHelper & {
     tooltipNameClass: string
     getElement: () => HTMLElement | null
     getInputElement: () => HTMLInputElement
-    setTooltipContent: (namesToIDs: namesToID[]) => void
+    setTooltipContent: (elems: Elem[]) => void
     appendTooltipContent: (nameToId: namesToID) => void
     removeTooltipContent: (id: string) => void
     getTooltip: () => HTMLElement | null
     hideTooltip: () => void
     showTooltip: () => void
-    getNamesToIDs: () => namesToID[]
+    // getNamesToIDs: () => namesToID[]
+    getElemsData: () => Elem[]
 }
+
+type Elem = {
+    type: string
+    attributes: { name: string; value: string }[]
+    children: string[]
+}
+
 type namesToID = { name: string; id: string }
 
 export type ContainerHelper = ElementHelper & {
@@ -154,10 +162,8 @@ export type Parser = {
     directMessageChar: string
     allLettersRegex: RegExp
     alphaNumericSpecialRegex: RegExp
-    namesToIDs: namesToID[]
     parseUserCommand: (
         command: string,
-        namesToIDs: namesToID[],
         commandConfigs: CommandConfigs
     ) => CommandConfig
     parse: () => void

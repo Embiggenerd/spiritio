@@ -41,7 +41,7 @@ const commandConfigs = {
             {
                 name: 'toUserID',
                 regex: /[A-Za-z0-9_@./#&+!$_*+-]/,
-                value: 0,
+                value: '',
             },
             {
                 name: 'text',

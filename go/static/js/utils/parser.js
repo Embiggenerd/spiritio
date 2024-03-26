@@ -3,7 +3,6 @@
  * @type {import("../../types").Parser}
  */
 const parser = {
-    namesToIDs: [],
     command: '',
     i: 0,
     workOrderKey: '',
@@ -13,9 +12,8 @@ const parser = {
     allLettersRegex: /[a-zA-Z]/,
     alphaNumericSpecialRegex: /[A-Za-z0-9_@./#&+!$_*+-]/,
 
-    parseUserCommand: function (command, namesToIDs, commandConfigs) {
+    parseUserCommand: function (command, commandConfigs) {
         this.command = command
-        this.namesToIDs = namesToIDs
         this.commandConfigs = commandConfigs
         this.parse()
         // this.parseDirectMessage()
@@ -93,17 +91,8 @@ const parser = {
     parseDirectMessage() {
         this.workOrderKey = 'direct message'
         const name = this.readWhileMatching(this.alphaNumericSpecialRegex)
-        let userID = ''
-        let i = 0
-        while (i < this.namesToIDs.length) {
-            if (this.namesToIDs[i].name === name) {
-                userID = this.namesToIDs[i].id
-                break
-            }
-            i++
-        }
 
-        this.commandConfigs[this.workOrderKey].args[0].value = Number(userID)
+        this.commandConfigs[this.workOrderKey].args[0].value = name
         this.skipWhitespace()
         const text = this.readWhileMatching(/./)
         this.commandConfigs[this.workOrderKey].args[1].value = text.trimEnd()

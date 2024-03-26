@@ -4,6 +4,7 @@
         "allowJs": true,
         "checkJs": true,
         "strict": true,
-        "lib": ["es2019", "dom", "DOM.Iterable"]
+        "lib": ["es2019", "dom", "DOM.Iterable"],
+        "target": "ES2015" // gets rid of some errors, there's no actual target because there is no build
     }
 }

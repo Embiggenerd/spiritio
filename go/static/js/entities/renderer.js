@@ -103,25 +103,37 @@ const chatInput = {
         const tooltip = this.getTooltip()
         if (tooltip) tooltip.classList.remove('hidden')
     },
-    setTooltipContent(userArray) {
+    // Tooltip is used to display and store state to be used by commands
+    setTooltipContent(elems) {
         let i = 0
         const tooltip = this.getTooltip()
         if (tooltip) tooltip.innerHTML = ''
 
-        while (i < userArray.length && tooltip) {
-            const str = `@${userArray[i].name}`
+        while (i < elems.length && tooltip) {
+            let str = ''
+            const element = document.createElement(elems[i].type)
 
-            const text = document.createTextNode(str)
-            const elem = document.createElement('div')
-            elem.classList.add(this.tooltipNameClass)
+            let j = 0
+            while (j < elems[i].children.length) {
+                const child = elems[i].children[j]
+                if (typeof child === 'string') {
+                    str = `@${child} `
+                    element.innerText = str
+                }
+                j++
+            }
 
-            // storing for later use
-            elem.dataset.name = userArray[i].name
-            elem.dataset.id = userArray[i].id.toString()
+            // Storing id and name to translate name to id in direct message command
+            let k = 0
+            while (k < elems[i].attributes.length) {
+                const attr = elems[i].attributes[k]
+                const name = attr.name
+                const value = attr.value
+                element.setAttribute(name, value)
+                k++
+            }
 
-            elem.appendChild(text)
-
-            elem.addEventListener('click', () => {
+            element.addEventListener('click', () => {
                 const input = this.getInputElement()
                 input.value = str
                 input.focus()
@@ -133,25 +145,45 @@ const chatInput = {
                 }, 0)
             })
 
-            tooltip.appendChild(elem)
+            tooltip.appendChild(element)
             i++
         }
     },
-    getNamesToIDs() {
-        const elems = document.getElementsByClassName(this.tooltipNameClass)
+    // getNamesToIDs() {
+    //     const elems = document.getElementsByClassName(this.tooltipNameClass)
+    //     let i = 0
+    //     const namesToIDs = []
+    //     while (i < elems.length) {
+    //         const e = elems[i]
+    //         if (e instanceof HTMLElement) {
+    //             namesToIDs.push({
+    //                 name: e.dataset.name || '',
+    //                 id: e.dataset.id || '',
+    //             })
+    //         }
+    //         i++
+    //     }
+    //     return namesToIDs
+    // },
+    getElemsData() {
+        const elements = document.getElementsByClassName(this.tooltipNameClass)
+        console.log({ elements })
         let i = 0
-        const namesToIDs = []
-        while (i < elems.length) {
-            const e = elems[i]
+        const elems = []
+        while (i < elements.length) {
+            const e = elements[i]
             if (e instanceof HTMLElement) {
-                namesToIDs.push({
-                    name: e.dataset.name || '',
-                    id: e.dataset.id || '',
+                elems.push({
+                    type: e.tagName.toLocaleLowerCase(),
+                    children: [e.dataset['name'] || ''],
+                    attributes: Array.from(e.attributes).map(
+                        ({ name, value }) => ({ name, value })
+                    ),
                 })
             }
             i++
         }
-        return namesToIDs
+        return elems
     },
     appendTooltipContent({ name, id }) {
         const currentNames = document.getElementsByClassName(

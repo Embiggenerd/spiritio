@@ -89,7 +89,7 @@ const component = {
                     } else {
                         if (assertTargetInputElement) {
                             assertTargetInputElement.value = commandLog[i]
-                            // some browers focus before moving the cursor
+                            // Some browsers focus before moving the cursor
                             setTimeout(() => {
                                 assertTargetInputElement.setSelectionRange(
                                     assertTargetInputElement.value.length,
@@ -120,13 +120,43 @@ const component = {
                 typeof message === 'string' &&
                 (message.startsWith('@') || message.startsWith('/'))
             ) {
-                const namesToIDs = this.renderer?.chatInput.getNamesToIDs()
+                const elems = this.renderer?.chatInput.getElemsData()
+                console.log({ elems })
 
                 const commandConfig = parser().parseUserCommand(
                     message,
-                    namesToIDs || [],
                     commandConfigs
                 )
+
+                console.log({ commandConfig })
+                // We need to match the name we get from parser to corresponding id stored in data attribute in tooltip
+                if (commandConfig.workOrder === 'user_message' && elems) {
+                    let i = 0
+                    while (i < elems.length) {
+                        // Loop over elems
+                        const elem = elems[i]
+                        /** @type {any} */
+                        const attrObj = {}
+                        let j = 0
+                        while (j < elem.attributes.length) {
+                            // Build an object for easy referencing
+                            const attr = elem.attributes[j]
+                            attrObj[attr.name] = attr.value
+                            j++
+                        }
+                        const nameInCmdCfg = commandConfig.args[0].value
+                        const nameInElems = attrObj['data-name']
+                        if (nameInElems === nameInCmdCfg) {
+                            // We find the match between names
+                            commandConfig.args[0].value = Number(
+                                attrObj['data-id']
+                            ) // Reassign value to the corresponding id
+                        }
+                        i++
+                    }
+                }
+
+                // create work oder from commandsConfig outside of parser
 
                 /**
                  * @type {import("../types").WorkOrder}
@@ -301,14 +331,13 @@ const component = {
                 }
 
                 this.orderWork({ order: 'get_current_guests' })
-                // this.renderer?.chatInput.setTooltipContent(data.visitors || [])
                 if (this.mediaService) {
                     this.mediaService = await this.mediaService.init()
                     if (
                         this.mediaService?.permissionsGranted &&
                         this.mediaService.stream
                     ) {
-                        // show local video
+                        // Show local video
                         this.renderer?.videoArea.addVideo(
                             this.mediaService.stream
                         )
@@ -402,7 +431,25 @@ const component = {
             }
 
             if (event === 'current_guests') {
-                this.renderer?.chatInput.setTooltipContent(data)
+                const elems = []
+                let i = 0
+                while (i < data.length) {
+                    elems.push({
+                        type: 'div',
+                        attributes: [
+                            { name: 'data-id', value: data[i].id.toString() },
+                            { name: 'data-name', value: data[i].name },
+                            {
+                                name: 'class',
+                                value: this.renderer?.chatInput
+                                    .tooltipNameClass,
+                            },
+                        ],
+                        children: [data[i].name],
+                    })
+                    i++
+                }
+                this.renderer?.chatInput.setTooltipContent(elems)
             }
         } catch (e) {
             this.handleError(e)
