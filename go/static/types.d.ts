@@ -51,9 +51,9 @@ type MediaService = {
 type Render = () => Renderer
 
 type Renderer = {
-    chatLog: ChatLogHelper
+    chatLog: ChatLog
     videoArea: VideoAreaHelper
-    chatInput: ChatInputHelper
+    chatForm: ChatForm
 }
 
 type ChatMessageHelper = ElementHelper & {
@@ -62,7 +62,7 @@ type ChatMessageHelper = ElementHelper & {
     create: (text: string, form: string) => HTMLElement
 }
 
-export type ChatLogHelper = ElementHelper & {
+export type ChatLog = ElementHelper & {
     id: string
     type: string
     classList: string[]
@@ -70,22 +70,30 @@ export type ChatLogHelper = ElementHelper & {
     addMessage: (message: { text: string; from_user_name: string }) => void
 }
 
-export type ChatInputHelper = ElementHelper & {
+export type Tooltip = {
+    tooltipID: string
+    tooltipNameClass: string
+    templateID: string
+    element: null | HTMLElement
+    chatInputElement: null | HTMLInputElement
+    create: (chatIntputElement: HTMLInputElement) => HTMLTemplateElement | null
+    hide: () => void
+    show: () => void
+    setContent: (elems: Elem[]) => void
+    getInputElement: () => null | HTMLInputElement
+    getElement: () => null | HTMLElement
+    getElemsData: () => Elem[] | undefined
+}
+
+export type ChatForm = ElementHelper & {
     zIndex: string
     inputID: string
     templateID: string
-    tooltipID: string
     tooltipNameClass: string
+    tooltipNames: Tooltip
+    tooltipCommands: Tooltip
     getElement: () => HTMLElement | null
     getInputElement: () => HTMLInputElement
-    setTooltipContent: (elems: Elem[]) => void
-    appendTooltipContent: (nameToId: namesToID) => void
-    removeTooltipContent: (id: string) => void
-    getTooltip: () => HTMLElement | null
-    hideTooltip: () => void
-    showTooltip: () => void
-    // getNamesToIDs: () => namesToID[]
-    getElemsData: () => Elem[]
 }
 
 type Elem = {
@@ -140,6 +148,7 @@ export type Component = {
 }
 
 export type CommandConfig = {
+    aliases?: string[]
     workOrder: string
     args: commandArgument[]
 }
@@ -162,6 +171,7 @@ export type Parser = {
     directMessageChar: string
     allLettersRegex: RegExp
     alphaNumericSpecialRegex: RegExp
+    aliases: string[]
     parseUserCommand: (
         command: string,
         commandConfigs: CommandConfigs
@@ -201,3 +211,5 @@ type UserMessageWorkDetails = {
     text: string
     to_user_id: number | null
 }
+
+type getAliasesFromCmdCfg = (cmdCfg: CommandConfigs) => string[]

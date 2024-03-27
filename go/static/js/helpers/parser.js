@@ -1,6 +1,8 @@
+import { getAliasesFromCmdCfg } from './index.js'
+
 /**
  * Parses a user message starting with '/' into a work order
- * @type {import("../../types").Parser}
+ * @type {import("../../types.js").Parser}
  */
 const parser = {
     command: '',
@@ -11,27 +13,23 @@ const parser = {
     directMessageChar: '@',
     allLettersRegex: /[a-zA-Z]/,
     alphaNumericSpecialRegex: /[A-Za-z0-9_@./#&+!$_*+-]/,
+    aliases: [],
 
     parseUserCommand: function (command, commandConfigs) {
         this.command = command
         this.commandConfigs = commandConfigs
+
+        this.aliases = getAliasesFromCmdCfg(commandConfigs)
+
+        this.commandConfigs
         this.parse()
-        // this.parseDirectMessage()
 
         return this.commandConfigs[this.workOrderKey]
     },
 
     parse: function () {
-        if (this.match(this.directMessageChar)) {
-            this.eat(this.directMessageChar)
-            this.parseDirectMessage()
-            return
-        }
-
         if (this.match(this.commandChar)) {
             this.eat(this.commandChar)
-        } else {
-            return
         }
 
         this.parseCommand(this.readWhileMatching(this.allLettersRegex))
@@ -41,7 +39,9 @@ const parser = {
 
         this.skipWhitespace()
         const argsCount = this.parseArguments(
-            this.readWhileMatching(this.alphaNumericSpecialRegex),
+            this.readWhileMatching(
+                this.commandConfigs[this.workOrderKey].args[0].regex
+            ),
             0
         )
         if (argsCount !== this.commandConfigs[this.workOrderKey].args.length) {
@@ -55,6 +55,26 @@ const parser = {
 
     // Find any words that are in the list of possible commands
     parseCommand: function (word) {
+        this.aliases.forEach((a) => {
+            if (this.match(a)) {
+                // If we match to any aliases,
+                let workOrderKey = ''
+                const keys = Object.keys(this.commandConfigs)
+                let i = 0
+                while (i < keys.length) {
+                    const key = keys[i] // Find which key the alias belongs to
+                    if (this.commandConfigs[key].aliases?.includes(a)) {
+                        workOrderKey = key
+                        break
+                    }
+
+                    i++
+                }
+                this.workOrderKey = workOrderKey // Set our work order key to alias' daddy
+                this.eat(a) // Skip past the alias to the arguments and return
+                return
+            }
+        })
         this.workOrderKey = this.workOrderKey + ' ' + word
         this.workOrderKey = this.workOrderKey.trim()
 
@@ -71,20 +91,34 @@ const parser = {
         this.parseCommand(this.readWhileMatching(this.allLettersRegex))
     },
 
-    parseArguments: function (arg, count) {
+    parseArguments: function (arg, argIndex) {
         this.skipWhitespace()
         if (!arg) {
-            return count
+            return argIndex
         }
 
-        const argCfg = this.commandConfigs[this.workOrderKey].args[count]
-        if (count < this.commandConfigs[this.workOrderKey].args.length) {
+        const argCfg = this.commandConfigs[this.workOrderKey].args[argIndex]
+        if (argIndex < this.commandConfigs[this.workOrderKey].args.length) {
             argCfg.value = arg
         }
 
+        const nextArgIndex = argIndex + 1
+
+        let nextRegex
+        // Use last regex in case there are extra arguments provided by user
+        if (!this.commandConfigs[this.workOrderKey].args[nextArgIndex]) {
+            nextRegex =
+                this.commandConfigs[this.workOrderKey].args[
+                    this.commandConfigs[this.workOrderKey].args.length - 1
+                ].regex
+        } else {
+            nextRegex =
+                this.commandConfigs[this.workOrderKey].args[nextArgIndex].regex
+        }
+
         return this.parseArguments(
-            this.readWhileMatching(this.alphaNumericSpecialRegex),
-            count + 1
+            this.readWhileMatching(nextRegex),
+            nextArgIndex
         )
     },
 

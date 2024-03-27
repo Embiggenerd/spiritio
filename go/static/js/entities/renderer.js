@@ -1,3 +1,7 @@
+// import commandConfigs from '../config/commandConfig.js'
+import commandsConfig from '../config/commandConfig.js'
+import { getElemsFromCmdCfg } from '../helpers/index.js'
+
 /**
  * @type {import("../../types").ChatMessageHelper}
  */
@@ -26,7 +30,7 @@ const chatMessage = {
 }
 
 /**
- * @type {import("../../types").ChatLogHelper}
+ * @type {import("../../types").ChatLog}
  */
 const chatLog = {
     id: 'chat-log',
@@ -50,18 +54,137 @@ const chatLog = {
     },
 }
 
+/** @type {import("../../types.js").Tooltip} */
+const tooltip = {
+    tooltipID: 'tooltip',
+    tooltipNameClass: 'tooltip-name',
+    templateID: 'tooltip-template',
+    element: null,
+    chatInputElement: null,
+    create: function (chatInputElement) {
+        this.chatInputElement = chatInputElement
+        let template = document.getElementById(this.templateID)
+        let assertTemplate = /** @type {HTMLTemplateElement | null} */ (
+            template
+        )
+        let clone
+        if (template && assertTemplate) {
+            if (assertTemplate.content.firstElementChild)
+                clone = assertTemplate.content.firstElementChild.cloneNode(true)
+        }
+        let assertCloneElement = /** @type {HTMLTemplateElement | null} */ (
+            clone
+        )
+
+        this.element = assertCloneElement
+
+        if (assertCloneElement) {
+            assertCloneElement.setAttribute('autocomplete', 'off')
+        }
+
+        return assertCloneElement
+    },
+    hide() {
+        const tooltip = this.getElement()
+        if (tooltip) tooltip.classList.add('hidden')
+    },
+    show() {
+        const tooltip = this.getElement()
+        if (tooltip) tooltip.classList.remove('hidden')
+    },
+
+    setContent(elems) {
+        let i = 0
+        const tooltip = this.getElement()
+        if (tooltip) tooltip.innerHTML = ''
+
+        while (i < elems.length && tooltip) {
+            let str = ''
+            const element = document.createElement(elems[i].type)
+
+            let j = 0
+            while (j < elems[i].children.length) {
+                const child = elems[i].children[j]
+                if (typeof child === 'string') {
+                    str = `${child} `
+                    element.innerText = str
+                }
+                j++
+            }
+
+            // Storing id and name to translate name to id in direct message command
+            let k = 0
+            while (k < elems[i].attributes.length) {
+                const attr = elems[i].attributes[k]
+                const name = attr.name
+                const value = attr.value
+                element.setAttribute(name, value)
+                k++
+            }
+
+            element.addEventListener('click', () => {
+                const input = this.getInputElement()
+                if (input) {
+                    const symbol = input.value[0]
+                    input.value = symbol + str
+                    input.focus()
+                    setTimeout(() => {
+                        input.setSelectionRange(
+                            input.value.length,
+                            input.value.length
+                        )
+                    }, 0)
+                }
+            })
+
+            tooltip.appendChild(element)
+            i++
+        }
+    },
+    getElemsData() {
+        const tt = this.getElement()
+        let elements
+        if (tt) {
+            elements = Array.from(tt.children)
+            let i = 0
+            const elems = []
+            while (i < elements.length) {
+                const e = elements[i]
+                if (e instanceof HTMLElement) {
+                    elems.push({
+                        type: e.tagName.toLocaleLowerCase(),
+                        children: [e.dataset['name'] || ''],
+                        attributes: Array.from(e.attributes).map(
+                            ({ name, value }) => ({ name, value })
+                        ),
+                    })
+                }
+                i++
+            }
+            return elems
+        }
+    },
+    getElement() {
+        return this.element
+    },
+    getInputElement() {
+        return this.chatInputElement
+    },
+}
+
 /**
- * @type {import("../../types").ChatInputHelper}
+ * @type {import("../../types").ChatForm}
  */
-const chatInput = {
+const chatForm = {
     classList: [],
     zIndex: '2000',
     id: 'chat-form',
     inputID: 'message',
     templateID: 'chat-input-template',
-    tooltipID: 'tooltip',
+    tooltipNames: { ...tooltip },
+    tooltipCommands: { ...tooltip },
     tooltipNameClass: 'tooltip-name',
-    type: 'text-area',
+    type: 'form',
     create: function () {
         let template = document.getElementById(this.templateID)
         let assertTemplate = /** @type {HTMLTemplateElement | null} */ (
@@ -92,151 +215,6 @@ const chatInput = {
         const elem = document.getElementById(this.inputID)
         return /** @type {HTMLInputElement} */ (elem)
     },
-    getTooltip() {
-        return document.getElementById(this.tooltipID)
-    },
-    hideTooltip() {
-        const tooltip = this.getTooltip()
-        if (tooltip) tooltip.classList.add('hidden')
-    },
-    showTooltip() {
-        const tooltip = this.getTooltip()
-        if (tooltip) tooltip.classList.remove('hidden')
-    },
-    // Tooltip is used to display and store state to be used by commands
-    setTooltipContent(elems) {
-        let i = 0
-        const tooltip = this.getTooltip()
-        if (tooltip) tooltip.innerHTML = ''
-
-        while (i < elems.length && tooltip) {
-            let str = ''
-            const element = document.createElement(elems[i].type)
-
-            let j = 0
-            while (j < elems[i].children.length) {
-                const child = elems[i].children[j]
-                if (typeof child === 'string') {
-                    str = `@${child} `
-                    element.innerText = str
-                }
-                j++
-            }
-
-            // Storing id and name to translate name to id in direct message command
-            let k = 0
-            while (k < elems[i].attributes.length) {
-                const attr = elems[i].attributes[k]
-                const name = attr.name
-                const value = attr.value
-                element.setAttribute(name, value)
-                k++
-            }
-
-            element.addEventListener('click', () => {
-                const input = this.getInputElement()
-                input.value = str
-                input.focus()
-                setTimeout(() => {
-                    input.setSelectionRange(
-                        input.value.length,
-                        input.value.length
-                    )
-                }, 0)
-            })
-
-            tooltip.appendChild(element)
-            i++
-        }
-    },
-    // getNamesToIDs() {
-    //     const elems = document.getElementsByClassName(this.tooltipNameClass)
-    //     let i = 0
-    //     const namesToIDs = []
-    //     while (i < elems.length) {
-    //         const e = elems[i]
-    //         if (e instanceof HTMLElement) {
-    //             namesToIDs.push({
-    //                 name: e.dataset.name || '',
-    //                 id: e.dataset.id || '',
-    //             })
-    //         }
-    //         i++
-    //     }
-    //     return namesToIDs
-    // },
-    getElemsData() {
-        const elements = document.getElementsByClassName(this.tooltipNameClass)
-        console.log({ elements })
-        let i = 0
-        const elems = []
-        while (i < elements.length) {
-            const e = elements[i]
-            if (e instanceof HTMLElement) {
-                elems.push({
-                    type: e.tagName.toLocaleLowerCase(),
-                    children: [e.dataset['name'] || ''],
-                    attributes: Array.from(e.attributes).map(
-                        ({ name, value }) => ({ name, value })
-                    ),
-                })
-            }
-            i++
-        }
-        return elems
-    },
-    appendTooltipContent({ name, id }) {
-        const currentNames = document.getElementsByClassName(
-            this.tooltipNameClass
-        )
-        let i = 0
-        // If name already exists im tooltip, do not append
-        while (i < currentNames.length) {
-            const assertHTMLElem = /** @type {HTMLElement} */ (currentNames[i])
-            if (assertHTMLElem.dataset.id === id) return
-            i++
-        }
-
-        const tooltip = this.getTooltip()
-
-        const str = `@${name}`
-
-        const text = document.createTextNode(str)
-        const elem = document.createElement('div')
-        elem.classList.add(this.tooltipNameClass)
-
-        // storing for later use
-        elem.dataset.name = name
-        elem.dataset.id = id.toString()
-
-        elem.appendChild(text)
-
-        elem.addEventListener('click', () => {
-            const input = this.getInputElement()
-            input.value = str
-            input.focus()
-            setTimeout(() => {
-                input.setSelectionRange(input.value.length, input.value.length)
-            }, 0)
-        })
-
-        tooltip?.appendChild(elem)
-    },
-
-    removeTooltipContent(id) {
-        const currentNames = document.getElementsByClassName(
-            this.tooltipNameClass
-        )
-
-        let i = 0
-        while (i < currentNames.length) {
-            const assertHTMLElem = /** @type {HTMLElement} */ (currentNames[i])
-            if (assertHTMLElem.dataset.id === id) {
-                assertHTMLElem.remove()
-            }
-            i++
-        }
-    },
 }
 
 /**
@@ -260,7 +238,6 @@ const container = {
  * @type {import("../../types").VideoAreaHelper}
  */
 const videoArea = {
-    // zIndex: 1000,
     id: 'video-area',
     type: 'div',
     classList: ['video-area'],
@@ -393,22 +370,40 @@ const render = () => {
     }
     root.append(containerElement)
 
-    // add area to contain video streams
+    // Add area to contain video streams
     const videoAreaElement = videoArea.create()
     if (videoAreaElement) containerElement.append(videoAreaElement)
 
-    // render chat log
+    // Render chat log
     const chatLogElement = chatLog.create()
     if (chatLogElement) containerElement.append(chatLogElement)
 
-    // render chat input box
-    const chatInputElement = chatInput.create()
-    if (chatInputElement) containerElement.append(chatInputElement)
+    // Render chat input box
+    const chatInputElement = chatForm.create()
+    if (chatInputElement) {
+        containerElement.append(chatInputElement)
+
+        const tooltipCommands = chatForm.tooltipCommands.create(
+            chatForm.getInputElement()
+        )
+        const assertTtCmd = /** @type {Node} */ (tooltipCommands)
+        chatInputElement.appendChild(assertTtCmd)
+
+        chatForm.tooltipCommands.setContent(getElemsFromCmdCfg(commandsConfig))
+
+        const tooltipNames = chatForm.tooltipNames.create(
+            chatForm.getInputElement()
+        )
+
+        const assertTtNamesNode = /** @type {Node} */ (tooltipNames)
+
+        chatInputElement.appendChild(assertTtNamesNode)
+    }
 
     return {
         chatLog,
         videoArea,
-        chatInput,
+        chatForm,
     }
 }
 

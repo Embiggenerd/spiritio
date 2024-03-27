@@ -1,5 +1,6 @@
-import parser from './utils/parser.js'
+import parser from './helpers/parser.js'
 import commandConfigs from './config/commandConfig.js'
+import { getAliasesFromCmdCfg } from './helpers/index.js'
 
 /**
  * @type {import("../types").Component}
@@ -28,11 +29,11 @@ const component = {
 
     assignHandleChatInput() {
         try {
-            const chatFormElement = this.renderer?.chatInput.getElement()
+            const chatFormElement = this.renderer?.chatForm.getElement()
             if (chatFormElement) {
                 chatFormElement.onsubmit = this.onChatSubmit.bind(this)
                 const chatInputElement =
-                    this.renderer?.chatInput.getInputElement()
+                    this.renderer?.chatForm.getInputElement()
                 if (chatInputElement) {
                     this.setOnChatKeyDown(chatInputElement)
                     chatInputElement.oninput = this.handleInput.bind(this)
@@ -45,10 +46,13 @@ const component = {
 
     handleInput: function (event) {
         const value = event.target.value
-        if (value[0] == '@' || value[0] == '/') {
-            this.renderer?.chatInput.showTooltip()
+        if (value[0] == '@' && value.length === 1) {
+            this.renderer?.chatForm.tooltipNames.show()
+        } else if (value[0] == '/' && value.length === 1) {
+            this.renderer?.chatForm.tooltipCommands.show()
         } else {
-            this.renderer?.chatInput.hideTooltip()
+            this.renderer?.chatForm.tooltipNames.hide()
+            this.renderer?.chatForm.tooltipCommands.hide()
         }
     },
 
@@ -70,7 +74,10 @@ const component = {
                 const assertTargetInputElement =
                     /** @type {HTMLInputElement | null }  */ (target)
 
-                if (event.key === up || event.key === down) {
+                if (
+                    lenCommands > -1 &&
+                    (event.key === up || event.key === down)
+                ) {
                     if (event.key === up) {
                         i--
                     }
@@ -116,21 +123,27 @@ const component = {
             if (formData) {
                 message = Object.fromEntries(formData).message
             }
+
+            const commandTriggers = [
+                '/',
+                ...getAliasesFromCmdCfg(commandConfigs),
+            ]
+
             if (
                 typeof message === 'string' &&
-                (message.startsWith('@') || message.startsWith('/'))
+                commandTriggers.includes(message[0])
             ) {
-                const elems = this.renderer?.chatInput.getElemsData()
-                console.log({ elems })
+                const elems =
+                    this.renderer?.chatForm.tooltipNames.getElemsData()
 
                 const commandConfig = parser().parseUserCommand(
                     message,
                     commandConfigs
                 )
 
-                console.log({ commandConfig })
                 // We need to match the name we get from parser to corresponding id stored in data attribute in tooltip
                 if (commandConfig.workOrder === 'user_message' && elems) {
+                    console.log({ elems })
                     let i = 0
                     while (i < elems.length) {
                         // Loop over elems
@@ -139,7 +152,7 @@ const component = {
                         const attrObj = {}
                         let j = 0
                         while (j < elem.attributes.length) {
-                            // Build an object for easy referencing
+                            // Build an object for easy referencing from attributes
                             const attr = elem.attributes[j]
                             attrObj[attr.name] = attr.value
                             j++
@@ -147,16 +160,15 @@ const component = {
                         const nameInCmdCfg = commandConfig.args[0].value
                         const nameInElems = attrObj['data-name']
                         if (nameInElems === nameInCmdCfg) {
-                            // We find the match between names
+                            // We find the elem with matching name and
+                            // Reassign value to the corresponding id
                             commandConfig.args[0].value = Number(
                                 attrObj['data-id']
-                            ) // Reassign value to the corresponding id
+                            )
                         }
                         i++
                     }
                 }
-
-                // create work oder from commandsConfig outside of parser
 
                 /**
                  * @type {import("../types").WorkOrder}
@@ -172,7 +184,7 @@ const component = {
                 })
                 this.addToCommandLog(message)
 
-                const inputElem = this.renderer?.chatInput?.getInputElement()
+                const inputElem = this.renderer?.chatForm?.getInputElement()
                 if (inputElem) this.setOnChatKeyDown(inputElem)
 
                 this.orderWork(work)
@@ -249,6 +261,7 @@ const component = {
     },
 
     handleError: function (error) {
+        console.error(error)
         const message = {
             text: error,
             from_user_name: 'ADMIN (to you)',
@@ -441,15 +454,14 @@ const component = {
                             { name: 'data-name', value: data[i].name },
                             {
                                 name: 'class',
-                                value: this.renderer?.chatInput
-                                    .tooltipNameClass,
+                                value: this.renderer?.chatForm.tooltipNameClass,
                             },
                         ],
                         children: [data[i].name],
                     })
                     i++
                 }
-                this.renderer?.chatInput.setTooltipContent(elems)
+                this.renderer?.chatForm.tooltipNames.setContent(elems)
             }
         } catch (e) {
             this.handleError(e)

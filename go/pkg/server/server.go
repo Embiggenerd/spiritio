@@ -366,6 +366,7 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			wo := &types.UserMessageWorkOrder{}
 			err = json.Unmarshal(raw, wo)
 			if err != nil {
+				s.handleError(ctx, "user message did not go through", 400, err, visitor)
 				break
 			}
 
@@ -384,10 +385,15 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 
 			isDirectMessage := data.ToUserID != 0
 			if isDirectMessage {
+				userPresent := false
 				for _, v := range visitor.Room.Visitors {
 					if v.User.ID == data.ToUserID {
+						userPresent = true
 						v.Notify(event)
 					}
+				}
+				if !userPresent {
+					s.handleError(ctx, "user is not present", 400, nil, visitor)
 				}
 			} else {
 				room.BroadcastEvent(event)
@@ -499,10 +505,8 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 			}
 
 		case "identify_streamid":
-			// name := ""
 			for _, v := range visitor.Room.Visitors {
 				if v.StreamID == workOrder.Details.(string) {
-					// name = v.User.Name
 					data := &types.StreamIDUserNameData{
 						StreamID: workOrder.Details.(string),
 						Name:     v.User.Name,
@@ -519,14 +523,12 @@ func (s *APIServer) serveWS(w http.ResponseWriter, r *http.Request) {
 
 		case "get_current_guests":
 			guests := types.CurrentGuestsData{}
-			// idMap := make(map[uint]bool)
 			// Remove duplicates and own visitor
 			for _, v := range visitor.Room.Visitors {
-				if v.User != nil && visitor.User != nil && visitor.User.ID != v.User.ID {
+				if v.User != nil && visitor.User != nil {
 					guests = append(guests, types.CurrentGuest{
 						Name: v.User.Name, ID: v.User.ID,
 					})
-
 				}
 			}
 			deduped := utils.RemoveDuplicate(guests)

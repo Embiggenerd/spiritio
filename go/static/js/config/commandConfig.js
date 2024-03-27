@@ -36,6 +36,7 @@ const commandConfigs = {
         ],
     },
     'direct message': {
+        aliases: ['@'],
         workOrder: 'user_message',
         args: [
             {
@@ -45,7 +46,7 @@ const commandConfigs = {
             },
             {
                 name: 'text',
-                regex: /[.]/,
+                regex: /./,
                 value: '',
             },
         ],
