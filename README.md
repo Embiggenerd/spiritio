@@ -10,14 +10,13 @@ Clone repo
 
 ```
 $cd go
-$make local
+$make docker
 ```
 
-Open localhost:8080 in chrome. Open a chrome incognito instance, copy paste the same 
-URL with the auto-generated room ID. Talk yo yourself, send messages, or seng private 
-messages. Type '/' for a list of commands, type '@' for a list of users in the room 
-you can direct message. 
-
+Open localhost:8080 in chrome. Open a chrome incognito instance, copy paste the
+same URL with the auto-generated room ID. Talk to yourself, send messages, or
+send private messages. Type '/' for a list of commands, type '@' for a list of
+users in the room you can direct message.
 
 ## Features:
 
@@ -37,9 +36,11 @@ If video suddenly stops working when running locally, it could be because chrome
 turns off video if it thinks it's misbehaving, so restart chrome.
 
 ## Implementation
-This uses no framework on the frontend - everything is vanilla JS to demonstrate you don't need reactive 
-state or a virtual DOM. The types are defined in a .d.ts file, however they are referenced using JS Docs.
-Types but no build step or bundle file.
+
+This uses no framework on the frontend - everything is vanilla JS to demonstrate
+you don't need reactive state or a virtual DOM. The types are defined in a .d.ts
+file, however they are referenced using JS Docs. Types but no build step or
+bundle file.
 
 The backend is a Selective Forwarding Unit, which means there are no peer to
 peer connections. The browser doesn't know this, and it goes through the various
@@ -78,9 +79,9 @@ or buttons to click.
 
 Write tests.
 
-Add direct messaging feature.
+Add direct messaging feature. ✓
 
-Add jsdoc types to front end.
+Add jsdoc types to front end. ✓
 
 Refactor backend for testability.
 

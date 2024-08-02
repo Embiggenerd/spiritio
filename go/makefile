@@ -16,7 +16,7 @@ prod:build
 	@./prod.sh
 
 docker: build-docker
-	sudo docker run --name spiritio -p 8080:8080 spirit
+	sudo docker run --name spiritio -p 8080:8080 --rm spirit 
 
 version=n5.1.2
 srcPath=tmp/$(version)/src
